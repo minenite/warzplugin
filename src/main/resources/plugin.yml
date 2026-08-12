@@ -3,8 +3,8 @@ version: 1.0.0
 main: net.minenite.warzplugin.WarzPlugin
 api-version: '1.21'
 author: icedmoca
-description: Warz-only features - fly speed, first-join spawn and random death spawns.
-softdepend: [ServerPlugin]
+description: Warz-only features - fly speed, spawns, and loot chest restock.
+softdepend: [ServerPlugin, WorldEdit]
 
 commands:
   speed:
@@ -16,3 +16,10 @@ commands:
   delspawn:
     description: Remove a numbered death spawn.
     usage: /delspawn <number>
+  warz:
+    description: Warz loot admin - createchest, createzone, delchest, loot, listchests.
+    usage: /warz <createchest|createzone|delchest|loot|listchests|reloot>
+    aliases: [wz]
+  reloot:
+    description: Restock all loot chests and reset the 600s XP-bar timer. DEV and above.
+    usage: /reloot

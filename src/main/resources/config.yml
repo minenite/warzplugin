@@ -7,6 +7,9 @@ spawn-min-rank: "DEV"
 # Lowest rank allowed to use /speed while flying. Operators always may.
 speed-min-rank: "SMOD"
 
+# Lowest rank allowed to manage loot chests (/warz createchest, reloot, …).
+loot-min-rank: "DEV"
+
 # First-join spawn. Set in-game with /setspawn (no number).
 # spawn:
 #   world: warz

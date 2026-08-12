@@ -26,14 +26,16 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Features that belong only on warz, not on the rest of the network.
  *
  * <p>ServerPlugin still runs here for friends, ranks and travel. This plugin
- * owns fly speed, the first-join spawn, and the pool of death spawns.
+ * owns fly speed, first-join / death spawns, and loot chest restock.
  */
 public final class WarzPlugin extends JavaPlugin implements Listener {
 
     private RankStore ranks;
     private Rank spawnRank;
     private Rank speedRank;
+    private Rank lootRank;
     private Location firstJoinSpawn;
+    private LootRestockService lootRestock;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -52,14 +54,42 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
         this.spawnRank = Rank.parse(getConfig().getString("spawn-min-rank", "DEV"));
         this.speedRank = Rank.parse(getConfig().getString("speed-min-rank", "SMOD"));
+        this.lootRank = Rank.parse(getConfig().getString("loot-min-rank", "DEV"));
         this.firstJoinSpawn = readLocation("spawn");
 
+        this.lootRestock = new LootRestockService(this);
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(this.lootRestock, this);
+        this.lootRestock.start();
+
         getServer().getScheduler().runTaskTimerAsynchronously(this, this.ranks::reload, 100L, 100L);
 
         getLogger().info("Warz features loaded"
                 + (this.firstJoinSpawn != null ? " (first-join spawn set)" : " (no first-join spawn yet)")
                 + ", " + deathSpawnIds().size() + " death spawn(s)");
+    }
+
+    @Override
+    public void onDisable() {
+        if (this.lootRestock != null) {
+            this.lootRestock.stop();
+        }
+    }
+
+    public LootRestockService lootRestock() {
+        return this.lootRestock;
+    }
+
+    /** DEV+ (or op) — create/delete loot chests, zones, and force reloot. */
+    public boolean mayManageLoot(Player player) {
+        if (player.isOp()) {
+            return true;
+        }
+        if (this.lootRank == null) {
+            return false;
+        }
+        this.ranks.reload();
+        return this.ranks.rankOf(player.getUniqueId()).atLeast(this.lootRank);
     }
 
     // --------------------------------------------------------------- commands
@@ -96,7 +126,106 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 return;
             }
             deleteDeathSpawn(event.getPlayer(), parts[1]);
+            return;
         }
+
+        if (label.equals("/reloot")) {
+            event.setCancelled(true);
+            handleReloot(event.getPlayer());
+            return;
+        }
+
+        if (label.equals("/warz") || label.equals("/wz")) {
+            event.setCancelled(true);
+            handleWarz(event.getPlayer(), parts);
+        }
+    }
+
+    private void handleReloot(Player player) {
+        if (!mayManageLoot(player)) {
+            player.sendMessage(ChatColor.RED + "You are not allowed to reloot.");
+            return;
+        }
+        int n = this.lootRestock.forceReloot(true);
+        player.sendMessage(ChatColor.GRAY + "Relooted " + ChatColor.WHITE + n
+                + ChatColor.GRAY + " chests. Timer reset to 600s.");
+    }
+
+    private void handleWarz(Player player, String[] parts) {
+        if (parts.length < 2) {
+            sendWarzHelp(player);
+            return;
+        }
+        String sub = parts[1].toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "createchest", "lootchest", "addchest" -> {
+                if (!mayManageLoot(player)) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    return;
+                }
+                this.lootRestock.beginCreateChest(player);
+            }
+            case "createzone", "zone" -> {
+                if (!mayManageLoot(player)) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    return;
+                }
+                if (parts.length < 3) {
+                    player.sendMessage(ChatColor.RED + "Usage: /warz createzone <1-7>");
+                    player.sendMessage(ChatColor.GRAY + "Select a 2D area with the WorldEdit wand first.");
+                    return;
+                }
+                try {
+                    this.lootRestock.createZone(player, Integer.parseInt(parts[2]));
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Zone must be a number 1–7.");
+                }
+            }
+            case "delchest", "removechest" -> {
+                if (!mayManageLoot(player)) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    return;
+                }
+                this.lootRestock.deleteLookingChest(player);
+            }
+            case "loot", "restock", "lootstatus" -> this.lootRestock.sendStatus(player);
+            case "reloot" -> handleReloot(player);
+            case "listchests" -> {
+                if (!mayManageLoot(player)) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    return;
+                }
+                List<String> rows = this.lootRestock.listChests();
+                player.sendMessage(ChatColor.GOLD + "---- Loot chests (" + rows.size() + ") ----");
+                if (rows.isEmpty()) {
+                    player.sendMessage(ChatColor.GRAY + "None yet. /warz createchest");
+                } else {
+                    for (String row : rows) {
+                        player.sendMessage(ChatColor.WHITE + row);
+                    }
+                }
+            }
+            default -> {
+                player.sendMessage(ChatColor.RED + "Unknown subcommand. Try /warz");
+                sendWarzHelp(player);
+            }
+        }
+    }
+
+    private void sendWarzHelp(Player player) {
+        player.sendMessage(ChatColor.GOLD + "---- Warz loot ----");
+        player.sendMessage(ChatColor.GREEN + "/warz createchest"
+                + ChatColor.WHITE + " register looked-at chest loot template");
+        player.sendMessage(ChatColor.GREEN + "/warz createzone <1-7>"
+                + ChatColor.WHITE + " WorldEdit 2D zone label");
+        player.sendMessage(ChatColor.GREEN + "/warz delchest"
+                + ChatColor.WHITE + " unregister looked-at loot chest");
+        player.sendMessage(ChatColor.GREEN + "/warz loot"
+                + ChatColor.WHITE + " restock timer / zone status");
+        player.sendMessage(ChatColor.GREEN + "/warz listchests"
+                + ChatColor.WHITE + " list registered loot chests");
+        player.sendMessage(ChatColor.GREEN + "/reloot"
+                + ChatColor.WHITE + " restock all chests and reset the 600s timer");
     }
 
     // ----------------------------------------------------------------- speed
