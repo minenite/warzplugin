@@ -42,6 +42,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private LootRestockService lootRestock;
     private ClanService clans;
     private ClanGuiService clanGui;
+    private ScoreboardService scoreboard;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -68,11 +69,14 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.clans = new ClanService(this);
         this.clans.load();
         this.clanGui = new ClanGuiService(this);
+        this.scoreboard = new ScoreboardService(this);
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this.lootRestock, this);
         getServer().getPluginManager().registerEvents(new ClanGuiListener(), this);
+        getServer().getPluginManager().registerEvents(this.scoreboard, this);
         this.lootRestock.start();
+        this.scoreboard.start();
 
         getServer().getScheduler().runTaskTimerAsynchronously(this, this.ranks::reload, 100L, 100L);
 
@@ -84,6 +88,9 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (this.scoreboard != null) {
+            this.scoreboard.stop();
+        }
         if (this.lootRestock != null) {
             this.lootRestock.stop();
         }
@@ -102,6 +109,10 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
     public ClanGuiService clanGui() {
         return this.clanGui;
+    }
+
+    public ScoreboardService scoreboard() {
+        return this.scoreboard;
     }
 
     /** DEV+ (or op) — create/delete loot chests, zones, and force reloot. */
@@ -424,6 +435,13 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                     }
                 }
             }
+            case "scuba", "givescuba", "vitalsgear" -> {
+                if (!mayManageLoot(player)) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    return;
+                }
+                this.scoreboard.giveScubaSet(player);
+            }
             default -> {
                 player.sendMessage(ChatColor.RED + "Unknown subcommand. Try /warz");
                 sendWarzHelp(player);
@@ -443,6 +461,8 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + ChatColor.WHITE + " restock timer / zone status");
         player.sendMessage(ChatColor.GREEN + "/warz listchests"
                 + ChatColor.WHITE + " list registered loot chests");
+        player.sendMessage(ChatColor.GREEN + "/warz scuba"
+                + ChatColor.WHITE + " give scuba + wetsuit + bandages");
         player.sendMessage(ChatColor.GREEN + "/reloot"
                 + ChatColor.WHITE + " restock all chests and reset the 600s timer");
     }
