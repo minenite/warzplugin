@@ -45,6 +45,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private ScoreboardService scoreboard;
     private HumanityService humanity;
     private WorldMapService worldMap;
+    private WorldFreezeListener worldFreeze;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -89,6 +90,10 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
             getServer().getPluginManager().registerEvents(this.worldMap, this);
             this.worldMap.startPushTask();
         }
+        this.worldFreeze = new WorldFreezeListener(this);
+        if (this.worldFreeze.isEnabled()) {
+            getServer().getPluginManager().registerEvents(this.worldFreeze, this);
+        }
         this.lootRestock.start();
         this.humanity.start();
         this.scoreboard.start();
@@ -99,7 +104,9 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + (this.firstJoinSpawn != null ? " (first-join spawn set)" : " (no first-join spawn yet)")
                 + ", " + deathSpawnIds().size() + " death spawn(s)"
                 + ", " + this.clans.allClans().size() + " clan(s)"
-                + (this.worldMap != null ? ", world map on" : ""));
+                + (this.worldMap != null ? ", world map on" : "")
+                + (this.worldFreeze != null && this.worldFreeze.isEnabled()
+                        ? ", world freeze on" : ""));
     }
 
     @Override

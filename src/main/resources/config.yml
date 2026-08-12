@@ -23,6 +23,17 @@ world-map:
   min-z: -5000
   max-z: 5000
 
+# Halt vanity world physics (floating sand/gravel, saplings/torches that would
+# pop without support, leaf decay, fluid flow, crop/grass growth, ice/snow fade).
+# Players can still break and place blocks.
+world-freeze:
+  enabled: true
+  gravity: true
+  physics: true
+  fluids: true
+  growth: true
+  fade-decay: true
+
 # How far a living player "occupies" a death spawn when choosing where someone
 # respawns. Players inside this radius count against that spawn; players farther
 # out but within death-spawn-look-range and looking toward it also count.
