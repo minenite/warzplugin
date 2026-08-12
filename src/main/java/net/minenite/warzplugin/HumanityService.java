@@ -162,14 +162,15 @@ public final class HumanityService implements Listener {
     }
 
     /**
-     * Chat / scoreboard tag, e.g. {@code &7[Survivor]}, {@code &a[Hero 1]}, {@code &c[Bandit 3]}.
+     * Chat tag in Latin, e.g. {@code &7[Superstes]}, {@code &a[Heros 1]}, {@code &c[Latro 3]}.
+     * Scoreboard keeps the English standing names.
      */
     public String chatTagFragment(UUID id) {
         Standing s = standingOf(id);
         return switch (s.kind()) {
-            case SURVIVOR -> "&7[&fSurvivor&7] ";
-            case HERO -> heroColor(s.level()) + "[Hero " + s.level() + "] ";
-            case BANDIT -> banditColor(s.level()) + "[Bandit " + s.level() + "] ";
+            case SURVIVOR -> "&7[&fSuperstes&7] ";
+            case HERO -> heroColor(s.level()) + "[Heros " + s.level() + "] ";
+            case BANDIT -> banditColor(s.level()) + "[Latro " + s.level() + "] ";
         };
     }
 
