@@ -290,7 +290,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onRespawn(PlayerRespawnEvent event) {
-        Location death = pickDeathSpawn();
+        Location death = pickDeathSpawn(event.getPlayer());
         if (death != null) {
             event.setRespawnLocation(death);
             return;
@@ -377,7 +377,16 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    private Location pickDeathSpawn() {
+    /**
+     * Picks the death spawn with the fewest players nearby.
+     *
+     * <p>A player counts against a spawn when they are in the same world and
+     * within {@code death-spawn-clearance} blocks, or when they are a bit farther
+     * but looking roughly toward it (so camping a sightline still pushes the
+     * next respawn elsewhere). Ties break toward the spawn whose nearest player
+     * is farthest away, then at random.
+     */
+    private Location pickDeathSpawn(Player respawning) {
         List<Location> options = new ArrayList<>();
         for (String id : deathSpawnIds()) {
             Location at = readLocation("death-spawns." + id);
@@ -388,7 +397,66 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         if (options.isEmpty()) {
             return null;
         }
-        return options.get(this.random.nextInt(options.size())).clone();
+        if (options.size() == 1) {
+            return options.get(0).clone();
+        }
+
+        double clearance = getConfig().getDouble("death-spawn-clearance", 64.0);
+        double lookRange = Math.max(clearance, getConfig().getDouble("death-spawn-look-range", 96.0));
+
+        int bestPressure = Integer.MAX_VALUE;
+        double bestNearest = -1.0;
+        List<Location> best = new ArrayList<>();
+
+        for (Location spawn : options) {
+            int pressure = 0;
+            double nearest = Double.POSITIVE_INFINITY;
+            World world = spawn.getWorld();
+            if (world == null) {
+                continue;
+            }
+            for (Player other : getServer().getOnlinePlayers()) {
+                if (other.equals(respawning) || !other.getWorld().equals(world)) {
+                    continue;
+                }
+                Location at = other.getLocation();
+                double dist = at.distance(spawn);
+                if (dist < nearest) {
+                    nearest = dist;
+                }
+                if (dist <= clearance || (dist <= lookRange && lookingToward(other, spawn))) {
+                    pressure++;
+                }
+            }
+            double nearestScore = nearest == Double.POSITIVE_INFINITY ? Double.MAX_VALUE : nearest;
+            if (pressure < bestPressure
+                    || (pressure == bestPressure && nearestScore > bestNearest)) {
+                bestPressure = pressure;
+                bestNearest = nearestScore;
+                best.clear();
+                best.add(spawn);
+            } else if (pressure == bestPressure
+                    && Math.abs(nearestScore - bestNearest) < 0.01) {
+                best.add(spawn);
+            }
+        }
+
+        if (best.isEmpty()) {
+            return options.get(this.random.nextInt(options.size())).clone();
+        }
+        return best.get(this.random.nextInt(best.size())).clone();
+    }
+
+    /** True when the player's look direction points roughly at the spawn. */
+    private static boolean lookingToward(Player player, Location spawn) {
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector toSpawn = spawn.toVector().subtract(eye.toVector());
+        if (toSpawn.lengthSquared() < 1.0e-6) {
+            return true;
+        }
+        toSpawn.normalize();
+        // Cosine of ~45° — wide enough that someone scanning the area still counts.
+        return eye.getDirection().normalize().dot(toSpawn) >= 0.7;
     }
 
     private Set<String> deathSpawnIds() {

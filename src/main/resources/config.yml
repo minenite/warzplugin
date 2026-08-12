@@ -10,6 +10,12 @@ speed-min-rank: "SMOD"
 # Lowest rank allowed to manage loot chests (/warz createchest, reloot, …).
 loot-min-rank: "DEV"
 
+# How far a living player "occupies" a death spawn when choosing where someone
+# respawns. Players inside this radius count against that spawn; players farther
+# out but within death-spawn-look-range and looking toward it also count.
+death-spawn-clearance: 64
+death-spawn-look-range: 96
+
 # First-join spawn. Set in-game with /setspawn (no number).
 # spawn:
 #   world: warz
@@ -20,8 +26,8 @@ loot-min-rank: "DEV"
 #   pitch: 0
 
 # Numbered death spawns. Set in-game with /setspawn <n>. On death the player is
-# put at one of these at random. If none are set, they fall back to the first-join
-# spawn, then to vanilla.
+# put at the quietest of these (fewest people nearby / looking). If none are set,
+# they fall back to the first-join spawn, then to vanilla.
 # death-spawns:
 #   "1":
 #     world: warz
