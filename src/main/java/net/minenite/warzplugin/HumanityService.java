@@ -162,15 +162,15 @@ public final class HumanityService implements Listener {
     }
 
     /**
-     * Chat tag in Latin, e.g. {@code &7[Superstes]}, {@code &a[Heros 1]}, {@code &c[Latro 3]}.
-     * Scoreboard keeps the English standing names.
+     * Chat tag with Roman-numeral levels, e.g. {@code &7[Survivor]}, {@code &a[Hero I]},
+     * {@code &c[Bandit III]}. Scoreboard keeps Arabic numerals.
      */
     public String chatTagFragment(UUID id) {
         Standing s = standingOf(id);
         return switch (s.kind()) {
-            case SURVIVOR -> "&7[&fSuperstes&7] ";
-            case HERO -> heroColor(s.level()) + "[Heros " + s.level() + "] ";
-            case BANDIT -> banditColor(s.level()) + "[Latro " + s.level() + "] ";
+            case SURVIVOR -> "&7[&fSurvivor&7] ";
+            case HERO -> heroColor(s.level()) + "[Hero " + roman(s.level()) + "] ";
+            case BANDIT -> banditColor(s.level()) + "[Bandit " + roman(s.level()) + "] ";
         };
     }
 
@@ -184,6 +184,16 @@ public final class HumanityService implements Listener {
         };
         String valueColor = h >= REGEN_CAP ? "&a" : (h >= BANDIT_1 ? "&e" : "&c");
         return color(label + " &8| " + valueColor + formatHumanity(h));
+    }
+
+    private static String roman(int level) {
+        return switch (level) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            default -> String.valueOf(level);
+        };
     }
 
     private static String heroColor(int level) {
