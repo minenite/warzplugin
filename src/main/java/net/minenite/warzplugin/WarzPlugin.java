@@ -19,6 +19,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -638,11 +639,23 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         Location death = pickDeathSpawn(event.getPlayer());
         if (death != null) {
             event.setRespawnLocation(death);
-            return;
-        }
-        if (this.firstJoinSpawn != null) {
+        } else if (this.firstJoinSpawn != null) {
             event.setRespawnLocation(this.firstJoinSpawn.clone());
         }
+        Player player = event.getPlayer();
+        // Hotbar slot 5 = inventory index 4. Run next tick so the inventory exists.
+        if (this.worldMap != null && this.worldMap.isLoaded()) {
+            getServer().getScheduler().runTask(this, () -> {
+                if (player.isOnline()) {
+                    this.worldMap.giveMap(player, 4);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeath(PlayerDeathEvent event) {
+        event.setDroppedExp(0);
     }
 
     private void setFirstJoinSpawn(Player actor) {

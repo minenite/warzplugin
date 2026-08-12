@@ -120,17 +120,55 @@ public final class WorldMapService implements Listener {
     }
 
     /**
-     * Gives the player a filled map bound to the world overview.
-     *
-     * @return true if the item was created and added to inventory (or dropped)
+     * Gives the player a filled map bound to the world overview (next free slot).
      */
     public boolean giveMap(Player player) {
-        if (!loaded || player == null) {
+        return giveMap(player, -1);
+    }
+
+    /**
+     * @param hotbarSlot hotbar index 0–8, or {@code -1} to use {@code addItem}
+     */
+    public boolean giveMap(Player player, int hotbarSlot) {
+        ItemStack stack = createMapItem(player);
+        if (stack == null) {
             return false;
+        }
+        try {
+            if (hotbarSlot >= 0 && hotbarSlot <= 8) {
+                ItemStack previous = player.getInventory().getItem(hotbarSlot);
+                player.getInventory().setItem(hotbarSlot, stack);
+                if (previous != null && previous.getType() != Material.AIR) {
+                    java.util.HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(previous);
+                    for (ItemStack drop : leftover.values()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), drop);
+                    }
+                }
+            } else {
+                java.util.HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+                for (ItemStack drop : leftover.values()) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), drop);
+                }
+            }
+            if (stack.getItemMeta() instanceof MapMeta meta && meta.getMapView() != null) {
+                player.sendMap(meta.getMapView());
+            }
+            return true;
+        } catch (Throwable t) {
+            plugin.getLogger().severe("Failed to give world map: " + t.getMessage());
+            t.printStackTrace();
+            return false;
+        }
+    }
+
+    /** Builds a Warz overview map item, or {@code null} on failure. */
+    public ItemStack createMapItem(Player player) {
+        if (!loaded || player == null) {
+            return null;
         }
         World world = player.getWorld();
         if (world == null) {
-            return false;
+            return null;
         }
         try {
             MapView view = Bukkit.createMap(world);
@@ -139,7 +177,7 @@ public final class WorldMapService implements Listener {
             ItemStack stack = new ItemStack(Material.FILLED_MAP);
             MapMeta meta = (MapMeta) stack.getItemMeta();
             if (meta == null) {
-                return false;
+                return null;
             }
             meta.setMapView(view);
             meta.setDisplayName(ChatColor.GOLD + "Warz Map");
@@ -148,18 +186,11 @@ public final class WorldMapService implements Listener {
                     ChatColor.RED + "●" + ChatColor.GRAY + " you  "
                             + ChatColor.GREEN + "●" + ChatColor.GRAY + " friends"));
             stack.setItemMeta(meta);
-
-            java.util.HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
-            for (ItemStack drop : leftover.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), drop);
-            }
-            // CardForge only pushes pixels when something calls sendMap / HoldingPlayer.
-            player.sendMap(view);
-            return true;
+            return stack;
         } catch (Throwable t) {
-            plugin.getLogger().severe("Failed to give world map: " + t.getMessage());
+            plugin.getLogger().severe("Failed to create world map: " + t.getMessage());
             t.printStackTrace();
-            return false;
+            return null;
         }
     }
 
