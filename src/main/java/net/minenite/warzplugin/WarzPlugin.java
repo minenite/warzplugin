@@ -87,6 +87,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this.scoreboard, this);
         if (this.worldMap != null) {
             getServer().getPluginManager().registerEvents(this.worldMap, this);
+            this.worldMap.startPushTask();
         }
         this.lootRestock.start();
         this.humanity.start();

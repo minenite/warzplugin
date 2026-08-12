@@ -153,11 +153,47 @@ public final class WorldMapService implements Listener {
             for (ItemStack drop : leftover.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), drop);
             }
+            // CardForge only pushes pixels when something calls sendMap / HoldingPlayer.
+            player.sendMap(view);
             return true;
         } catch (Throwable t) {
             plugin.getLogger().severe("Failed to give world map: " + t.getMessage());
             t.printStackTrace();
             return false;
+        }
+    }
+
+    /** Keep overview pixels flowing to clients holding a filled map. */
+    public void startPushTask() {
+        Bukkit.getScheduler().runTaskTimer(plugin, this::pushHeldMaps, 20L, 10L);
+    }
+
+    private void pushHeldMaps() {
+        if (!loaded) {
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            pushIfMap(player, player.getInventory().getItemInMainHand());
+            pushIfMap(player, player.getInventory().getItemInOffHand());
+        }
+    }
+
+    private void pushIfMap(Player player, ItemStack stack) {
+        if (stack == null || stack.getType() != Material.FILLED_MAP) {
+            return;
+        }
+        if (!(stack.getItemMeta() instanceof MapMeta meta)) {
+            return;
+        }
+        MapView view = meta.getMapView();
+        if (view == null) {
+            return;
+        }
+        attach(view);
+        try {
+            player.sendMap(view);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("sendMap failed: " + t.getMessage());
         }
     }
 
