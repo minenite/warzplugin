@@ -27,3 +27,7 @@ commands:
     description: Create, join, leave, invite, and manage clans.
     usage: /clan [create|join|leave|invite|promote|demote|decline|help|<name>]
     aliases: [c]
+  humanity:
+    description: View your (or another's) humanity standing.
+    usage: /humanity [player] | /humanity set <player> <amount>
+    aliases: [hum]

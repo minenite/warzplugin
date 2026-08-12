@@ -371,9 +371,13 @@ public final class ScoreboardService implements Listener {
         String deg = color(String.format(Locale.US, "%s%.1f\u00B0F", tempColor(tempF), tempF));
         String bloodLine = color(String.format(Locale.US, "%sBlood: %.1fL", bloodColor(blood), blood));
         String thirstLine = color(String.format(Locale.US, "%sThirst: %.0f%%", thirstColor(thirstVal), thirstVal));
-        setLine(obj, deg + ChatColor.BLACK, 3);
-        setLine(obj, bloodLine + ChatColor.DARK_BLUE, 2);
-        setLine(obj, thirstLine + ChatColor.DARK_GREEN, 1);
+        String humanityLine = plugin.humanity() != null
+                ? plugin.humanity().scoreboardLine(player)
+                : color("&7Survivor &8| &a2,500");
+        setLine(obj, deg + ChatColor.BLACK, 4);
+        setLine(obj, bloodLine + ChatColor.DARK_BLUE, 3);
+        setLine(obj, thirstLine + ChatColor.DARK_GREEN, 2);
+        setLine(obj, humanityLine + ChatColor.DARK_PURPLE, 1);
     }
 
     private static String tempColor(double tempF) {

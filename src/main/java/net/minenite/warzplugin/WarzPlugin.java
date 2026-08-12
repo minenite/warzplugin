@@ -43,6 +43,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private ClanService clans;
     private ClanGuiService clanGui;
     private ScoreboardService scoreboard;
+    private HumanityService humanity;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -69,13 +70,16 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.clans = new ClanService(this);
         this.clans.load();
         this.clanGui = new ClanGuiService(this);
+        this.humanity = new HumanityService(this);
         this.scoreboard = new ScoreboardService(this);
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this.lootRestock, this);
         getServer().getPluginManager().registerEvents(new ClanGuiListener(), this);
+        getServer().getPluginManager().registerEvents(this.humanity, this);
         getServer().getPluginManager().registerEvents(this.scoreboard, this);
         this.lootRestock.start();
+        this.humanity.start();
         this.scoreboard.start();
 
         getServer().getScheduler().runTaskTimerAsynchronously(this, this.ranks::reload, 100L, 100L);
@@ -90,6 +94,9 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     public void onDisable() {
         if (this.scoreboard != null) {
             this.scoreboard.stop();
+        }
+        if (this.humanity != null) {
+            this.humanity.stop();
         }
         if (this.lootRestock != null) {
             this.lootRestock.stop();
@@ -113,6 +120,10 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
     public ScoreboardService scoreboard() {
         return this.scoreboard;
+    }
+
+    public HumanityService humanity() {
+        return this.humanity;
     }
 
     /** DEV+ (or op) — create/delete loot chests, zones, and force reloot. */
@@ -188,26 +199,80 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
             return;
         }
 
+        if (label.equals("/humanity") || label.equals("/hum")) {
+            event.setCancelled(true);
+            handleHumanity(event.getPlayer(), parts);
+            return;
+        }
+
         if (label.equals("/clan") || label.equals("/c")) {
             event.setCancelled(true);
             handleClan(event.getPlayer(), parts);
         }
     }
 
+    private void handleHumanity(Player player, String[] parts) {
+        if (parts.length >= 2 && mayAdminClans(player)) {
+            // /humanity set <player> <amount>  or  /humanity <player>
+            if (parts[1].equalsIgnoreCase("set") && parts.length >= 4) {
+                OfflinePlayer target = resolvePlayer(parts[2]);
+                if (target == null || target.getUniqueId() == null) {
+                    player.sendMessage(ChatColor.RED + "Unknown player.");
+                    return;
+                }
+                try {
+                    int value = Integer.parseInt(parts[3]);
+                    this.humanity.set(target.getUniqueId(), value);
+                    this.humanity.save();
+                    String name = target.getName() != null ? target.getName() : parts[2];
+                    player.sendMessage(ChatColor.GRAY + "Set " + name + "'s humanity to "
+                            + ChatColor.WHITE + String.format("%,d", value));
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Usage: /humanity set <player> <amount>");
+                }
+                return;
+            }
+            if (!parts[1].equalsIgnoreCase("set")) {
+                OfflinePlayer target = resolvePlayer(parts[1]);
+                if (target != null && target.getUniqueId() != null) {
+                    showHumanity(player, target.getUniqueId(),
+                            target.getName() != null ? target.getName() : parts[1]);
+                    return;
+                }
+            }
+        }
+        showHumanity(player, player.getUniqueId(), player.getName());
+    }
+
+    private void showHumanity(Player viewer, java.util.UUID id, String name) {
+        int h = this.humanity.get(id);
+        String tag = ClanService.color(this.humanity.chatTagFragment(id).trim());
+        viewer.sendMessage(ChatColor.GOLD + name + ChatColor.GRAY + ": " + tag
+                + ChatColor.DARK_GRAY + " (" + ChatColor.WHITE + String.format("%,d", h)
+                + ChatColor.DARK_GRAY + ")");
+    }
+
     /**
-     * Puts the clan tag in front of ServerPlugin's rank-coloured chat line.
+     * Puts humanity standing then clan tag in front of ServerPlugin's chat line.
      * Runs at the same priority after ServerPlugin (we softdepend it).
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onChat(AsyncPlayerChatEvent event) {
-        if (this.clans == null) {
+        StringBuilder prefix = new StringBuilder();
+        if (this.humanity != null) {
+            prefix.append(ClanService.color(
+                    this.humanity.chatTagFragment(event.getPlayer().getUniqueId())));
+        }
+        if (this.clans != null) {
+            String frag = this.clans.chatTagFragment(event.getPlayer().getUniqueId());
+            if (!frag.isEmpty()) {
+                prefix.append(ClanService.color(frag));
+            }
+        }
+        if (prefix.length() == 0) {
             return;
         }
-        String frag = this.clans.chatTagFragment(event.getPlayer().getUniqueId());
-        if (frag.isEmpty()) {
-            return;
-        }
-        event.setFormat(ClanService.color(frag) + event.getFormat());
+        event.setFormat(prefix + event.getFormat());
     }
 
     private void handleClan(Player player, String[] parts) {
