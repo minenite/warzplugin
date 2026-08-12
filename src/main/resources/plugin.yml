@@ -1,0 +1,18 @@
+name: WarzPlugin
+version: 1.0.0
+main: net.minenite.warzplugin.WarzPlugin
+api-version: '1.21'
+author: icedmoca
+description: Warz-only features - fly speed, first-join spawn and random death spawns.
+softdepend: [ServerPlugin]
+
+commands:
+  speed:
+    description: Set your fly speed from 1 to 10. SMOD and above, while flying.
+    usage: /speed <1-10>
+  setspawn:
+    description: Set the first-join spawn, or a numbered death spawn.
+    usage: /setspawn [number]
+  delspawn:
+    description: Remove a numbered death spawn.
+    usage: /delspawn <number>

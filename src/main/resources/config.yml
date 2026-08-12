@@ -1,0 +1,29 @@
+# Same shared directory ServerPlugin uses - ranks live there.
+shared-directory: /home/dad/Desktop/minenitemodded/shared
+
+# Lowest rank allowed to set or delete spawns. Operators always may.
+spawn-min-rank: "DEV"
+
+# Lowest rank allowed to use /speed while flying. Operators always may.
+speed-min-rank: "SMOD"
+
+# First-join spawn. Set in-game with /setspawn (no number).
+# spawn:
+#   world: warz
+#   x: 0
+#   y: 64
+#   z: 0
+#   yaw: 0
+#   pitch: 0
+
+# Numbered death spawns. Set in-game with /setspawn <n>. On death the player is
+# put at one of these at random. If none are set, they fall back to the first-join
+# spawn, then to vanilla.
+# death-spawns:
+#   "1":
+#     world: warz
+#     x: 0
+#     y: 64
+#     z: 0
+#     yaw: 0
+#     pitch: 0
