@@ -13,6 +13,16 @@ loot-min-rank: "DEV"
 # Lowest rank allowed to use /clan delete|kick|setowner. Operators always may.
 clan-admin-min-rank: "DEV"
 
+# Filled maps show the full warz overview (themap.png). Red = you, green = online friends.
+# Bounds are the world area the PNG covers (10k×10k centered on 0,0 by default).
+world-map:
+  enabled: true
+  image: themap.png
+  min-x: -5000
+  max-x: 5000
+  min-z: -5000
+  max-z: 5000
+
 # How far a living player "occupies" a death spawn when choosing where someone
 # respawns. Players inside this radius count against that spawn; players farther
 # out but within death-spawn-look-range and looking toward it also count.

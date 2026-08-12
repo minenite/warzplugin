@@ -50,7 +50,7 @@ public final class ClanService {
     private final File file;
     private final Map<String, Clan> clans = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerClan = new ConcurrentHashMap<>();
-    /** Invitee → pending clan tags (uppercase). */
+    /** Invitee → pending clan tags (exact casing). */
     private final Map<UUID, Set<String>> invites = new ConcurrentHashMap<>();
 
     public ClanService(WarzPlugin plugin) {
@@ -171,11 +171,15 @@ public final class ClanService {
         });
     }
 
+    /**
+     * Keeps letter case; strips non-alphanumeric. {@code Abc} and {@code ABC} are
+     * different clans.
+     */
     public static String normalizeTag(String raw) {
         if (raw == null) {
             return null;
         }
-        String t = raw.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        String t = raw.trim().replaceAll("[^A-Za-z0-9]", "");
         if (t.isEmpty() || t.length() > MAX_TAG_LEN) {
             return null;
         }

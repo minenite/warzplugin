@@ -29,7 +29,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Features that belong only on warz, not on the rest of the network.
  *
  * <p>ServerPlugin still runs here for friends, ranks and travel. This plugin
- * owns fly speed, spawns, loot restock, and clans.
+ * owns fly speed, spawns, loot restock, clans, and the world overview map.
  */
 public final class WarzPlugin extends JavaPlugin implements Listener {
 
@@ -44,6 +44,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private ClanGuiService clanGui;
     private ScoreboardService scoreboard;
     private HumanityService humanity;
+    private WorldMapService worldMap;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -72,12 +73,21 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.clanGui = new ClanGuiService(this);
         this.humanity = new HumanityService(this);
         this.scoreboard = new ScoreboardService(this);
+        if (getConfig().getBoolean("world-map.enabled", true)) {
+            this.worldMap = new WorldMapService(this);
+            if (!this.worldMap.load()) {
+                this.worldMap = null;
+            }
+        }
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this.lootRestock, this);
         getServer().getPluginManager().registerEvents(new ClanGuiListener(), this);
         getServer().getPluginManager().registerEvents(this.humanity, this);
         getServer().getPluginManager().registerEvents(this.scoreboard, this);
+        if (this.worldMap != null) {
+            getServer().getPluginManager().registerEvents(this.worldMap, this);
+        }
         this.lootRestock.start();
         this.humanity.start();
         this.scoreboard.start();
@@ -87,7 +97,8 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         getLogger().info("Warz features loaded"
                 + (this.firstJoinSpawn != null ? " (first-join spawn set)" : " (no first-join spawn yet)")
                 + ", " + deathSpawnIds().size() + " death spawn(s)"
-                + ", " + this.clans.allClans().size() + " clan(s)");
+                + ", " + this.clans.allClans().size() + " clan(s)"
+                + (this.worldMap != null ? ", world map on" : ""));
     }
 
     @Override
@@ -190,6 +201,12 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         if (label.equals("/reloot")) {
             event.setCancelled(true);
             handleReloot(event.getPlayer());
+            return;
+        }
+
+        if (label.equals("/map") || label.equals("/warzmap")) {
+            event.setCancelled(true);
+            giveWorldMap(event.getPlayer());
             return;
         }
 
@@ -507,10 +524,24 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 }
                 this.scoreboard.giveScubaSet(player);
             }
+            case "map" -> giveWorldMap(player);
             default -> {
                 player.sendMessage(ChatColor.RED + "Unknown subcommand. Try /warz");
                 sendWarzHelp(player);
             }
+        }
+    }
+
+    private void giveWorldMap(Player player) {
+        if (this.worldMap == null || !this.worldMap.isLoaded()) {
+            player.sendMessage(ChatColor.RED + "World map is not available.");
+            return;
+        }
+        if (this.worldMap.giveMap(player)) {
+            player.sendMessage(ChatColor.GRAY + "Here's the "
+                    + ChatColor.GOLD + "Warz Map" + ChatColor.GRAY + ". Hold it to view.");
+        } else {
+            player.sendMessage(ChatColor.RED + "Could not create the map.");
         }
     }
 
@@ -528,6 +559,8 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + ChatColor.WHITE + " list registered loot chests");
         player.sendMessage(ChatColor.GREEN + "/warz scuba"
                 + ChatColor.WHITE + " give scuba + wetsuit + bandages");
+        player.sendMessage(ChatColor.GREEN + "/map"
+                + ChatColor.WHITE + " get the full-server overview map");
         player.sendMessage(ChatColor.GREEN + "/reloot"
                 + ChatColor.WHITE + " restock all chests and reset the 600s timer");
     }
