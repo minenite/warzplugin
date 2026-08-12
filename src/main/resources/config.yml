@@ -10,6 +10,9 @@ speed-min-rank: "SMOD"
 # Lowest rank allowed to manage loot chests (/warz createchest, reloot, …).
 loot-min-rank: "DEV"
 
+# Lowest rank allowed to use /clan delete|kick|setowner. Operators always may.
+clan-admin-min-rank: "DEV"
+
 # How far a living player "occupies" a death spawn when choosing where someone
 # respawns. Players inside this radius count against that spawn; players farther
 # out but within death-spawn-look-range and looking toward it also count.

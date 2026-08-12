@@ -10,13 +10,16 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -26,7 +29,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Features that belong only on warz, not on the rest of the network.
  *
  * <p>ServerPlugin still runs here for friends, ranks and travel. This plugin
- * owns fly speed, first-join / death spawns, and loot chest restock.
+ * owns fly speed, spawns, loot restock, and clans.
  */
 public final class WarzPlugin extends JavaPlugin implements Listener {
 
@@ -34,8 +37,11 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private Rank spawnRank;
     private Rank speedRank;
     private Rank lootRank;
+    private Rank clanAdminRank;
     private Location firstJoinSpawn;
     private LootRestockService lootRestock;
+    private ClanService clans;
+    private ClanGuiService clanGui;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -55,18 +61,25 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.spawnRank = Rank.parse(getConfig().getString("spawn-min-rank", "DEV"));
         this.speedRank = Rank.parse(getConfig().getString("speed-min-rank", "SMOD"));
         this.lootRank = Rank.parse(getConfig().getString("loot-min-rank", "DEV"));
+        this.clanAdminRank = Rank.parse(getConfig().getString("clan-admin-min-rank", "DEV"));
         this.firstJoinSpawn = readLocation("spawn");
 
         this.lootRestock = new LootRestockService(this);
+        this.clans = new ClanService(this);
+        this.clans.load();
+        this.clanGui = new ClanGuiService(this);
+
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this.lootRestock, this);
+        getServer().getPluginManager().registerEvents(new ClanGuiListener(), this);
         this.lootRestock.start();
 
         getServer().getScheduler().runTaskTimerAsynchronously(this, this.ranks::reload, 100L, 100L);
 
         getLogger().info("Warz features loaded"
                 + (this.firstJoinSpawn != null ? " (first-join spawn set)" : " (no first-join spawn yet)")
-                + ", " + deathSpawnIds().size() + " death spawn(s)");
+                + ", " + deathSpawnIds().size() + " death spawn(s)"
+                + ", " + this.clans.allClans().size() + " clan(s)");
     }
 
     @Override
@@ -74,10 +87,21 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         if (this.lootRestock != null) {
             this.lootRestock.stop();
         }
+        if (this.clans != null) {
+            this.clans.save();
+        }
     }
 
     public LootRestockService lootRestock() {
         return this.lootRestock;
+    }
+
+    public ClanService clans() {
+        return this.clans;
+    }
+
+    public ClanGuiService clanGui() {
+        return this.clanGui;
     }
 
     /** DEV+ (or op) — create/delete loot chests, zones, and force reloot. */
@@ -90,6 +114,18 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         }
         this.ranks.reload();
         return this.ranks.rankOf(player.getUniqueId()).atLeast(this.lootRank);
+    }
+
+    /** DEV+ (or op) — /clan delete, kick, setowner. */
+    public boolean mayAdminClans(Player player) {
+        if (player.isOp()) {
+            return true;
+        }
+        if (this.clanAdminRank == null) {
+            return false;
+        }
+        this.ranks.reload();
+        return this.ranks.rankOf(player.getUniqueId()).atLeast(this.clanAdminRank);
     }
 
     // --------------------------------------------------------------- commands
@@ -138,7 +174,190 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         if (label.equals("/warz") || label.equals("/wz")) {
             event.setCancelled(true);
             handleWarz(event.getPlayer(), parts);
+            return;
         }
+
+        if (label.equals("/clan") || label.equals("/c")) {
+            event.setCancelled(true);
+            handleClan(event.getPlayer(), parts);
+        }
+    }
+
+    /**
+     * Puts the clan tag in front of ServerPlugin's rank-coloured chat line.
+     * Runs at the same priority after ServerPlugin (we softdepend it).
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onChat(AsyncPlayerChatEvent event) {
+        if (this.clans == null) {
+            return;
+        }
+        String frag = this.clans.chatTagFragment(event.getPlayer().getUniqueId());
+        if (frag.isEmpty()) {
+            return;
+        }
+        event.setFormat(ClanService.color(frag) + event.getFormat());
+    }
+
+    private void handleClan(Player player, String[] parts) {
+        // parts[0] is /clan; args start at 1
+        if (parts.length == 1) {
+            ClanService.Clan own = this.clans.clanOf(player.getUniqueId());
+            if (own == null) {
+                player.sendMessage(ClanService.color("&cYou're not in a clan."));
+                List<String> pending = this.clans.pendingInvites(player.getUniqueId());
+                if (!pending.isEmpty()) {
+                    player.sendMessage(ClanService.color(
+                            "&ePending invites: &f" + String.join("&7, &f", pending)));
+                }
+                player.sendMessage(ClanService.color(
+                        "&7/clan create <name> &8· &7/clan join [name] &8· &7/clan <name>"));
+                return;
+            }
+            this.clanGui.open(player, own);
+            return;
+        }
+
+        String sub = parts[1].toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "create" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan create <name>"));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.create(player, parts[2])));
+            }
+            case "join" -> {
+                String tag = parts.length >= 3 ? parts[2] : null;
+                player.sendMessage(ClanService.color(this.clans.join(player, tag)));
+            }
+            case "leave" -> player.sendMessage(ClanService.color(this.clans.leave(player)));
+            case "decline" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan decline <clan>"));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.declineInvite(player, parts[2])));
+            }
+            case "invite" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan invite <player>"));
+                    return;
+                }
+                OfflinePlayer target = resolvePlayer(parts[2]);
+                if (target == null) {
+                    player.sendMessage(ClanService.color("&cUnknown player."));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.invite(player, target)));
+            }
+            case "promote" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan promote <player>"));
+                    return;
+                }
+                OfflinePlayer target = resolvePlayer(parts[2]);
+                if (target == null) {
+                    player.sendMessage(ClanService.color("&cUnknown player."));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.promote(player, target)));
+            }
+            case "demote" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan demote <player>"));
+                    return;
+                }
+                OfflinePlayer target = resolvePlayer(parts[2]);
+                if (target == null) {
+                    player.sendMessage(ClanService.color("&cUnknown player."));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.demote(player, target)));
+            }
+            case "delete" -> {
+                if (!mayAdminClans(player)) {
+                    player.sendMessage(ClanService.color("&cNo permission."));
+                    return;
+                }
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan delete <clan>"));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.adminDelete(player, parts[2])));
+            }
+            case "kick" -> {
+                if (!mayAdminClans(player)) {
+                    player.sendMessage(ClanService.color("&cNo permission."));
+                    return;
+                }
+                if (parts.length < 3) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan kick <player>"));
+                    return;
+                }
+                OfflinePlayer target = resolvePlayer(parts[2]);
+                if (target == null) {
+                    player.sendMessage(ClanService.color("&cUnknown player."));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.adminKick(player, target)));
+            }
+            case "setowner" -> {
+                if (!mayAdminClans(player)) {
+                    player.sendMessage(ClanService.color("&cNo permission."));
+                    return;
+                }
+                if (parts.length < 4) {
+                    player.sendMessage(ClanService.color("&cUsage: /clan setowner <clan> <player>"));
+                    return;
+                }
+                OfflinePlayer target = resolvePlayer(parts[3]);
+                if (target == null) {
+                    player.sendMessage(ClanService.color("&cUnknown player."));
+                    return;
+                }
+                player.sendMessage(ClanService.color(this.clans.adminSetOwner(player, parts[2], target)));
+            }
+            case "help" -> sendClanHelp(player);
+            default -> {
+                ClanService.Clan clan = this.clans.get(parts[1]);
+                if (clan == null) {
+                    player.sendMessage(ClanService.color("&cUnknown clan or subcommand."));
+                    sendClanHelp(player);
+                    return;
+                }
+                this.clanGui.open(player, clan);
+            }
+        }
+    }
+
+    private void sendClanHelp(Player player) {
+        player.sendMessage(ClanService.color("&5Clan commands:"));
+        player.sendMessage(ClanService.color("&7/clan &8— &fyour clan GUI"));
+        player.sendMessage(ClanService.color("&7/clan <name> &8— &fview a clan"));
+        player.sendMessage(ClanService.color("&7/clan create <name> &8— &f1–5 letters/numbers"));
+        player.sendMessage(ClanService.color("&7/clan invite <player>"));
+        player.sendMessage(ClanService.color("&7/clan join [name] &8— &faccept invite"));
+        player.sendMessage(ClanService.color("&7/clan decline <name>"));
+        player.sendMessage(ClanService.color("&7/clan leave"));
+        player.sendMessage(ClanService.color("&7/clan promote|demote <player> &8— &fowner only"));
+        if (mayAdminClans(player)) {
+            player.sendMessage(ClanService.color("&cAdmin: &7/clan delete <clan>"));
+            player.sendMessage(ClanService.color("&cAdmin: &7/clan kick <player>"));
+            player.sendMessage(ClanService.color("&cAdmin: &7/clan setowner <clan> <player>"));
+        }
+    }
+
+    private static OfflinePlayer resolvePlayer(String name) {
+        Player online = Bukkit.getPlayerExact(name);
+        if (online != null) {
+            return online;
+        }
+        OfflinePlayer off = Bukkit.getOfflinePlayer(name);
+        if (off.hasPlayedBefore() || off.isOnline()) {
+            return off;
+        }
+        return null;
     }
 
     private void handleReloot(Player player) {
