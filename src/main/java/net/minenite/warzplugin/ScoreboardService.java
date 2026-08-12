@@ -32,7 +32,10 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
+
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 
 /**
  * WarZ vitals sidebar — body temp, blood, thirst — matching the Paper WarZ HUD.
@@ -341,14 +344,8 @@ public final class ScoreboardService implements Listener {
                 Criteria.DUMMY,
                 ChatColor.AQUA.toString() + ChatColor.BOLD + "Vitals");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        try {
-            // Hide the score numbers on the right (Paper).
-            Class<?> numberFormat = Class.forName("io.papermc.paper.scoreboard.numbers.NumberFormat");
-            Object blank = numberFormat.getMethod("blank").invoke(null);
-            obj.getClass().getMethod("numberFormat", numberFormat).invoke(obj, blank);
-        } catch (ReflectiveOperationException ignored) {
-            // Older / partial APIs — numbers stay visible.
-        }
+        // Hide the 3/2/1 score numbers on the right of the sidebar.
+        obj.numberFormat(NumberFormat.blank());
         boards.put(player.getUniqueId(), board);
         player.setScoreboard(board);
     }
@@ -363,6 +360,7 @@ public final class ScoreboardService implements Listener {
         if (obj == null) {
             return;
         }
+        obj.numberFormat(NumberFormat.blank());
         for (String entry : board.getEntries()) {
             board.resetScores(entry);
         }
@@ -412,7 +410,9 @@ public final class ScoreboardService implements Listener {
         if (entry.length() > 40) {
             entry = entry.substring(0, 40);
         }
-        obj.getScore(entry).setScore(score);
+        Score line = obj.getScore(entry);
+        line.setScore(score);
+        line.numberFormat(NumberFormat.blank());
     }
 
     private static String color(String ampersand) {
