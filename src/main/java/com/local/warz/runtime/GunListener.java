@@ -98,6 +98,14 @@ public final class GunListener implements Listener {
         if (session.heldGun(hand).isEmpty()) {
             return;
         }
+        // A corpse is looted with the same click that fires a gun, and in this game
+        // you are nearly always holding one - so the gun swallowed the click and
+        // the body would not open. Looting wins when the crosshair is on a body.
+        if (event.getRightClicked().getPersistentDataContainer()
+                .has(com.local.warz.WarzKeys.of("corpse_id"),
+                        org.bukkit.persistence.PersistentDataType.STRING)) {
+            return;
+        }
         event.setCancelled(true);
         session.suppressAimSwing(250L);
         session.onClick("right", null);

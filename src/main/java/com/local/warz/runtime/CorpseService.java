@@ -449,7 +449,8 @@ public final class CorpseService implements Listener {
                 pose,
                 bodyYaw,
                 skinValue,
-                skinSignature
+                skinSignature,
+                spawnAt.clone()
         ));
 
         plugin.getLogger().info("Corpse spawned for " + ownerName
@@ -546,7 +547,9 @@ public final class CorpseService implements Listener {
         return player.getLocation().distanceSquared(torso) <= lootRangeSq();
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    // LOW and not ignoring cancellation: the gun listener also answers entity
+    // right-clicks, and whichever ran first decided whether the corpse opened.
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = false)
     public void onInteract(PlayerInteractEntityEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
@@ -652,9 +655,33 @@ public final class CorpseService implements Listener {
         while (it.hasNext()) {
             Corpse corpse = it.next().getValue();
             Entity body = Bukkit.getEntity(corpse.bodyEntityId);
+            if (body == null) {
+                // Not resolvable usually means its chunk is unloaded, not that the
+                // body is gone. Forgetting the corpse here was the whole problem:
+                // the entities stayed in the world untracked, so returning to the
+                // site found a body that would not open and never despawned, and
+                // every death left another one.
+                if (now < corpse.despawnAtMs) {
+                    continue;
+                }
+                // Expired: bring the chunk back so it can actually be cleaned up.
+                if (corpse.origin != null && corpse.origin.getWorld() != null) {
+                    corpse.origin.getChunk().load();
+                    body = Bukkit.getEntity(corpse.bodyEntityId);
+                }
+                if (body == null) {
+                    if (plugin.getConfig().getBoolean("corpses.drop-on-expire", true)) {
+                        dropRemaining(corpse, corpse.origin);
+                    }
+                    clearLoot(corpse);
+                    it.remove();
+                    saveCorpses();
+                    continue;
+                }
+            }
             Entity click = Bukkit.getEntity(corpse.clickEntityId);
             Entity label = Bukkit.getEntity(corpse.labelEntityId);
-            if (body == null || !body.isValid()) {
+            if (!body.isValid()) {
                 clearLoot(corpse);
                 if (click != null) {
                     click.remove();
@@ -663,6 +690,7 @@ public final class CorpseService implements Listener {
                     label.remove();
                 }
                 it.remove();
+                saveCorpses();
                 continue;
             }
             if (now >= corpse.despawnAtMs) {
@@ -681,6 +709,7 @@ public final class CorpseService implements Listener {
                 clearLoot(corpse);
                 closeViewers(corpse);
                 body.remove();
+                saveCorpses();
                 if (click != null) {
                     click.remove();
                 }
@@ -1053,15 +1082,18 @@ public final class CorpseService implements Listener {
         /** The owner's texture property, kept so a restored body still wears their skin. */
         final String skinValue;
         final String skinSignature;
+        /** Where the body was placed, so it can be found when its chunk comes back. */
+        final Location origin;
         final Pose pose;
         /** Death yaw — sleeping body stretches this way from the feet origin. */
         final float bodyYaw;
 
         Corpse(UUID id, UUID ownerId, String ownerName, UUID bodyEntityId, UUID clickEntityId,
                UUID labelEntityId, Inventory inventory, long despawnAtMs, Pose pose, float bodyYaw,
-               String skinValue, String skinSignature) {
+               String skinValue, String skinSignature, Location origin) {
             this.skinValue = skinValue;
             this.skinSignature = skinSignature;
+            this.origin = origin;
             this.id = id;
             this.ownerId = ownerId;
             this.ownerName = ownerName;
