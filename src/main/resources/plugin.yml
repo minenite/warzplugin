@@ -3,7 +3,7 @@ version: 1.0.0
 main: net.minenite.warzplugin.WarzPlugin
 api-version: '1.21'
 author: icedmoca
-description: Warz-only features - fly speed, spawns, loot restock, clans, and world map.
+description: Warz-only features - fly speed, spawns, loot restock, clans, world map, and guns.
 softdepend: [ServerPlugin, WorldEdit]
 
 commands:
@@ -35,3 +35,15 @@ commands:
     description: Get the full-server Warz overview map.
     usage: /map
     aliases: [warzmap]
+  profile:
+    description: View your (or another player's) WarZ profile stats
+    usage: /profile [player]
+    aliases: [stats]
+
+permissions:
+  warz.user:
+    description: Use basic WarZ gun commands
+    default: true
+  warz.admin:
+    description: Give guns, editor, workbench admin
+    default: op

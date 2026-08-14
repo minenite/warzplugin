@@ -17,7 +17,14 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
-/** Clan roster GUI — player heads with role lore. */
+import com.local.warz.runtime.ItemFactory;
+import com.local.warz.runtime.ProfileStatsService;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
+
+import java.util.Locale;
+
+/** Clan roster GUI — heads with stats hover; click opens /profile. */
 public final class ClanGuiService {
 
     public static final class Holder implements InventoryHolder {
@@ -85,6 +92,19 @@ public final class ClanGuiService {
         viewer.openInventory(inv);
     }
 
+    public void handleClick(Player viewer, int slot, Holder holder) {
+        if (viewer == null || holder == null) {
+            return;
+        }
+        UUID id = holder.memberAt(slot);
+        if (id == null || plugin.profileGui() == null) {
+            return;
+        }
+        OfflinePlayer subject = Bukkit.getOfflinePlayer(id);
+        viewer.closeInventory();
+        plugin.profileGui().open(viewer, subject);
+    }
+
     private ItemStack memberHead(UUID id, ClanRole role) {
         OfflinePlayer op = Bukkit.getOfflinePlayer(id);
         String name = op.getName() != null ? op.getName() : "Unknown";
@@ -94,16 +114,31 @@ public final class ClanGuiService {
             skull.setOwningPlayer(op);
         }
         String roleLabel = switch (role) {
-            case OWNER -> ChatColor.GOLD.toString() + ChatColor.UNDERLINE + "Owner";
-            case MOD -> ChatColor.LIGHT_PURPLE.toString() + ChatColor.ITALIC + "Mod";
-            case MEMBER -> ChatColor.GRAY + "Member";
+            case OWNER -> "&6&nOwner";
+            case MOD -> "&d&oMod";
+            case MEMBER -> "&7Member";
         };
-        meta.setDisplayName(ChatColor.WHITE + name);
-        List<String> lore = new ArrayList<>();
-        lore.add(roleLabel);
+        meta.displayName(ItemFactory.colorize("&f" + name)
+                .decoration(TextDecoration.ITALIC, false));
+        List<Component> lore = new ArrayList<>();
+        lore.add(ItemFactory.colorize(roleLabel).decoration(TextDecoration.ITALIC, false));
         boolean online = Bukkit.getPlayer(id) != null;
-        lore.add(online ? ChatColor.GREEN + "Online" : ChatColor.DARK_GRAY + "Offline");
-        meta.setLore(lore);
+        lore.add(ItemFactory.colorize(online ? "&aOnline" : "&8Offline")
+                .decoration(TextDecoration.ITALIC, false));
+        if (plugin.profileStats() != null) {
+            ProfileStatsService.Stats stats = plugin.profileStats().get(id);
+            double kdr = ProfileStatsService.kdrValue(stats.playerKills, stats.pvpDeaths);
+            String color = ProfileStatsService.kdrColorCode(kdr, stats.playerKills, stats.pvpDeaths);
+            lore.add(ItemFactory.colorize("&7Kills: &f" + String.format(Locale.US, "%,d", stats.playerKills))
+                    .decoration(TextDecoration.ITALIC, false));
+            lore.add(ItemFactory.colorize("&7Deaths: &f" + String.format(Locale.US, "%,d", stats.pvpDeaths))
+                    .decoration(TextDecoration.ITALIC, false));
+            lore.add(ItemFactory.colorize("&7KDR: " + color + String.format(Locale.US, "%.2f", kdr))
+                    .decoration(TextDecoration.ITALIC, false));
+            lore.add(ItemFactory.colorize("&8Click to open profile")
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+        meta.lore(lore);
         stack.setItemMeta(meta);
         return stack;
     }

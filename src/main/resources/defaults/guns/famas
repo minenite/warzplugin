@@ -1,0 +1,36 @@
+gunName=&eFamas
+-------
+gunType=293
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=6
+-------
+roundsPerBurst=3
+bulletsPerClick=1
+gunDamage=8
+maxDistance=48
+bulletSpeed=3.8
+accuracy=0.15
+accuracy_aimed=0.002
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=30
+reloadGunOnDrop=true
+reloadTime=75
+--------
+reloadType=NORMAL
+gunSound=note snare drum,item break,ghast fireball
+localGunSound=true
+recoil=0.045
+knockback=0.3
+resethitcooldown=true

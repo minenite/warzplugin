@@ -1,0 +1,36 @@
+gunName=&eModel 1887
+-------
+gunType=278
+ammoType=295
+ammoAmtNeeded=1
+bulletDelayTime=25
+-------
+roundsPerBurst=1
+bulletsPerClick=7
+gunDamage=11
+maxDistance=24
+bulletSpeed=3.25
+accuracy=0.185
+accuracy_aimed=0.185
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=false
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=4
+reloadGunOnDrop=true
+reloadTime=50
+--------
+reloadType=INDIVIDUAL_BULLET
+gunSound=ghast fireball,explode
+localGunSound=true
+recoil=1.85
+knockback=3
+resethitcooldown=true

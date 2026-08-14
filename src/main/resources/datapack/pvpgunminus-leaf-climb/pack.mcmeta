@@ -1,0 +1,7 @@
+{
+    "pack": {
+        "description": "PVPGunMinus: climb through leaves by jumping",
+        "min_format": [107, 1],
+        "max_format": [107, 1]
+    }
+}

@@ -1,0 +1,32 @@
+gunName=&eTomahawk
+-------
+gunType=286
+ammoType=286
+ammoAmtNeeded=1
+bulletDelayTime=10
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=46
+maxDistance=0
+bulletSpeed=1.6
+accuracy=0.01
+accuracy_aimed=0.01
+-------
+canAim=false
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=999
+reloadGunOnDrop=false
+reloadTime=80
+canGoPastMaxDistance=true
+gunSound=ghast fireball
+resethitcooldown=true

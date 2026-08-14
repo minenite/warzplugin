@@ -53,7 +53,8 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
 
 /**
- * Loot restock: 600s XP-bar timer, weighted chest pools, zones 1–7, chest protection.
+ * Loot restock: 600s XP-level timer, weighted chest pools, zones 1–7, chest protection.
+ * XP bar fill is thirst (see {@link com.local.warz.runtime.ThirstService}); the level number is this timer.
  *
  * <p>Ported from the Paper WarZ plugin. When creating a chest, slot rows set rarity:
  * top row = common, middle = uncommon, bottom+ = rare (weighted rolls).
@@ -155,8 +156,9 @@ public final class LootRestockService implements Listener {
         }
         int level = Math.max(0, remaining);
         player.setLevel(level);
-        float frac = RESTOCK_SECONDS <= 0 ? 0f : remaining / (float) RESTOCK_SECONDS;
-        player.setExp(Math.max(0f, Math.min(0.999f, frac)));
+        if (plugin.thirst() != null) {
+            plugin.thirst().applyExpBar(player);
+        }
     }
 
     public boolean beginCreateChest(Player player) {
@@ -622,9 +624,20 @@ public final class LootRestockService implements Listener {
         event.setDroppedExp(0);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onExpOrbSpawn(org.bukkit.event.entity.EntitySpawnEvent event) {
+        if (event.getEntity() instanceof org.bukkit.entity.ExperienceOrb) {
+            event.setCancelled(true);
+            event.getEntity().remove();
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onExpChange(PlayerExpChangeEvent event) {
         event.setAmount(0);
+        if (plugin.thirst() != null) {
+            plugin.thirst().applyExpBar(event.getPlayer());
+        }
     }
 
     @EventHandler

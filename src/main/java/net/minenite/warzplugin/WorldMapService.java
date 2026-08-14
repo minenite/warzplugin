@@ -196,7 +196,9 @@ public final class WorldMapService implements Listener {
 
     /** Keep overview pixels flowing to clients holding a filled map. */
     public void startPushTask() {
-        Bukkit.getScheduler().runTaskTimer(plugin, this::pushHeldMaps, 20L, 10L);
+        // Same path as when this first worked — sendMap while held. Every 2 ticks
+        // so the red/green dots track movement; furnace desync is fixed in CardForge.
+        Bukkit.getScheduler().runTaskTimer(plugin, this::pushHeldMaps, 10L, 2L);
     }
 
     private void pushHeldMaps() {

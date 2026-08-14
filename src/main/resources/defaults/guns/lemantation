@@ -1,0 +1,36 @@
+gunName=&eLamentation
+-------
+gunType=265
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=2
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=5
+maxDistance=76
+bulletSpeed=4.25
+accuracy=0.15
+accuracy_aimed=0.01
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=50
+reloadGunOnDrop=true
+reloadTime=80
+--------
+reloadType=NORMAL
+gunSound=skeleton hurt,zombie wood,ghast fireball
+localGunSound=true
+recoil=0.025
+knockback=0.3
+resethitcooldown=true

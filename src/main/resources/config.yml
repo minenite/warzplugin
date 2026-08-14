@@ -34,6 +34,44 @@ world-freeze:
   growth: true
   fade-decay: true
 
+# Remove sapling / fungus item entities instantly (and sweep leftovers every 2s).
+# Planted decorative saplings stay as blocks via CardForge + world-freeze.
+sapling-item-despawn: true
+
+# Boss bar compass tape (N / NE / E / …) with a centered ▲.
+# Only shown while the player has a compass in their inventory.
+facing-boss-bar:
+  enabled: true
+
+# Non-builder place/break is temporary: reverted on restart.
+# Permanent builds: held rank SMOD+ AND currently showing as BUILDER
+# via /tag builder. A real BUILDER rank alone does not persist edits.
+# Op alone does not persist either.
+transient-blocks:
+  enabled: true
+
+# Unsuppressed shots pull nearby zombies. Suppressors shrink the radius;
+# subsonic + can is almost silent. Loud shots can spawn one extra at the edge.
+gunshot-noise:
+  enabled: true
+  spawn-chance: 0.18
+
+# Sparse ambient zombies/husks near players (day + night). Dig-up FX on spawn.
+# chance-per-player is rolled each interval; raise carefully — it gets noisy fast.
+zombie-spawns:
+  enabled: true
+  interval-ticks: 100
+  chance-per-player: 0.35
+  min-range: 14
+  max-range: 38
+  max-near-player: 8
+  near-radius: 48
+  husk-chance: 0.28
+
+# Skip the vanilla death screen: players respawn immediately (gamerule
+# doImmediateRespawn + a same-tick server force if the client stalls).
+instant-respawn: true
+
 # How far a living player "occupies" a death spawn when choosing where someone
 # respawns. Players inside this radius count against that spawn; players farther
 # out but within death-spawn-look-range and looking toward it also count.
@@ -60,3 +98,26 @@ death-spawn-look-range: 96
 #     z: 0
 #     yaw: 0
 #     pitch: 0
+
+# Guns / attachments / ammo are all STICK items with CustomModelData (MineniteWARZ pack).
+gun-base-material: STICK
+seed-defaults: true
+companion:
+  features:
+    leaves: true
+    chainlink: true
+
+# CardForge does not fire Bukkit explode events — WarZ snapshots before blasts
+# and restores broken blocks slowly. /warz regen [on|off|toggle|status|clear|now]
+explosion-regen:
+  enabled: true
+  ticks-per-block: 6
+  volume: 0.12
+  pitch: 1.55
+  sound: BLOCK_STONE_PLACE
+  # How fast a backlog is cleared. Below this rate the gentle ticks-per-block
+  # pacing applies; above it, regen speeds up to finish the queue within
+  # drain-seconds, so a large crater does not take minutes while later blasts
+  # wait behind it.
+  drain-seconds: 20
+  max-blocks-per-tick: 32

@@ -1,0 +1,34 @@
+gunName=&eMolotov
+-------
+gunType=348
+ammoType=SELF
+consumable=true
+ammoAmtNeeded=1
+bulletDelayTime=20
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=30
+maxDistance=0
+bulletSpeed=1.35
+accuracy=0
+-------
+canAim=false
+fireRadius=6
+# classic flame cloud: 6.0,0.1,200,FLAME,count=5,offset=2:0.4:2,speed=0.0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&cYou need a Molotov!
+gunSound=shoot arrow
+needsPermission=false
+--------
+hasClip=false
+timeUntilRelease=35
+remnantItem=GLASS_BOTTLE
+remnantName=&7Broken Glass Bottle
+remnantAmount=1
+remnantPickupDelay=5
+remnantLifetime=12000
+resethitcooldown=true

@@ -15,11 +15,12 @@ import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.MoistureChangeEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
+import org.bukkit.event.world.StructureGrowEvent;
 
 /**
  * Halts vanity world physics on warz: gravity sand/gravel, unsupported plants
- * popping, leaf decay, fluid flow, crop growth, etc. Players can still break
- * and place blocks; the terrain just does not settle or grow on its own.
+ * popping, leaf decay, fluid flow, crop/tree growth, etc. Players can still
+ * break and place blocks; the terrain just does not settle or grow on its own.
  */
 public final class WorldFreezeListener implements Listener {
 
@@ -74,14 +75,48 @@ public final class WorldFreezeListener implements Listener {
 
     /**
      * Neighbor updates that would pop saplings, torches, carpets, etc. when
-     * their support is removed.
+     * their support is removed. Always cancel (even if another plugin already
+     * touched the event) so floating saplings stay put and do not drop.
      */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPhysics(BlockPhysicsEvent event) {
         if (!enabled || !physics) {
             return;
         }
         event.setCancelled(true);
+    }
+
+    /**
+     * Extra belt-and-suspenders: nothing may replace a sapling / fungus /
+     * mangrove propagule via entity block changes while freeze is on (except
+     * we still allow player breaks through BlockBreakEvent).
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityTouchPlant(EntityChangeBlockEvent event) {
+        if (!enabled || !physics) {
+            return;
+        }
+        if (event.getEntity() instanceof FallingBlock) {
+            // handled in onEntityChangeBlock for gravity
+            return;
+        }
+        if (event.getEntity() instanceof org.bukkit.entity.Player) {
+            return;
+        }
+        if (isFrozenPlant(event.getBlock().getType())) {
+            event.setCancelled(true);
+        }
+    }
+
+    private static boolean isFrozenPlant(org.bukkit.Material type) {
+        if (type == null) {
+            return false;
+        }
+        String name = type.name();
+        return name.endsWith("_SAPLING")
+                || name.equals("MANGROVE_PROPAGULE")
+                || name.endsWith("_FUNGUS")
+                || name.equals("BAMBOO_SAPLING");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -94,6 +129,15 @@ public final class WorldFreezeListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onGrow(BlockGrowEvent event) {
+        if (!enabled || !growth) {
+            return;
+        }
+        event.setCancelled(true);
+    }
+
+    /** Saplings (and bone meal) never turn into trees / huge fungi. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onStructureGrow(StructureGrowEvent event) {
         if (!enabled || !growth) {
             return;
         }
@@ -124,9 +168,10 @@ public final class WorldFreezeListener implements Listener {
         event.setCancelled(true);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onLeaves(LeavesDecayEvent event) {
-        if (!enabled || !fadeDecay) {
+        // Always keep leaves, even if fade-decay is toggled off.
+        if (!enabled) {
             return;
         }
         event.setCancelled(true);

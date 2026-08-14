@@ -1,0 +1,73 @@
+# Full reference gun — copy/rename out of EXAMPLE*, then delete lines you don't need.
+# Filename = /guns give <id>. ammoType=SELF for consumable. remnantItem=NONE for no leftover.
+# bulletType: blank=snowball | egg | arrow | crossbow | wither | fireball | smallfireball | enderpearl | laser
+# reloadType: NORMAL | BOLT | PUMP | INDIVIDUAL_BULLET
+gunName=&eExample Gun
+-------
+gunType=BONE
+ammoType=CLAY_BALL
+consumable=false
+ammoAmtNeeded=1
+bulletDelayTime=10
+bulletType=
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=5
+armorPenetration=0
+explosionDamage=-1
+maxDistance=50
+canGoPastMaxDistance=false
+bulletSpeed=3.5
+accuracy=0.1
+accuracy_aimed=0.05
+accuracy_crouched=0.08
+recoil=0.25
+recoilpitch=2
+knockback=0
+-------
+canAim=true
+canAimLeft=true
+canAimRight=false
+canClickLeft=false
+canClickRight=true
+canHeadshot=true
+resetHitCooldown=true
+explodeRadius=0
+fireRadius=0
+flashRadius=0
+destroyBulletWhenHit=true
+hasSmokeTrail=false
+timeUntilRelease=-1
+-------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+permissionMessage=&cNo permission for this gun.
+-------
+hasClip=true
+maxClipSize=30
+reloadGunOnDrop=true
+reloadTime=40
+reloadType=NORMAL
+-------
+localGunSound=true
+gunVolume=1.0
+gunSound=ghast fireball
+-------
+remnantItem=NONE
+remnantName=&7Used Example Shell
+remnantAmount=1
+remnantPickupDelay=10
+remnantLifetime=6000
+-------
+laserSight=false
+laserSightAimOnly=true
+laserSightColor=#FF2020
+laserSightRange=-1
+laserSightSize=0.28
+laserSightOffsetRight=0.32
+laserSightOffsetUp=-0.28
+laserSightOffsetForward=0.55
+laserSightDensity=1.0
+laserSightGlow=false
+laserSightGlowStrength=0.35

@@ -1,0 +1,36 @@
+gunName=&eM1014
+-------
+gunType=270
+ammoType=295
+ammoAmtNeeded=2
+bulletDelayTime=21
+-------
+roundsPerBurst=1
+bulletsPerClick=8
+gunDamage=3
+maxDistance=8
+bulletSpeed=3.35
+accuracy=0.19
+accuracy_aimed=0.19
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=8
+reloadGunOnDrop=true
+reloadTime=70
+--------
+reloadType=PUMP
+gunSound=ghast fireball,explode
+localGunSound=true
+recoil=0.3
+knockback=0
+resethitcooldown=true

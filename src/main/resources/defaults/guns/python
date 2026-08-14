@@ -1,0 +1,36 @@
+gunName=&ePython
+-------
+gunType=284
+ammoType=368
+ammoAmtNeeded=1
+bulletDelayTime=6
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=14
+maxDistance=48
+bulletSpeed=4.5
+accuracy=0.15
+accuracy_aimed=0.01
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=9
+reloadGunOnDrop=true
+reloadTime=70
+--------
+reloadType=NORMAL
+localGunSound=true
+gunSound=ghast fireball,zombie metal
+recoil=0.18
+knockback=3
+resethitcooldown=true

@@ -1,0 +1,47 @@
+gunName=&eBarrett 50cal
+-------
+gunType=258
+ammoType=337
+ammoAmtNeeded=2
+bulletDelayTime=20
+reloadType=BOLT
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=26
+maxDistance=400
+bulletSpeed=4.5
+accuracy=0.4
+accuracy_aimed=0.01
+recoil=1
+recoilpitch=8
+knockback=0
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+gunSound=irongolem hit,wither shoot
+--------
+hasClip=true
+maxClipSize=5
+reloadGunOnDrop=true
+reloadTime=80
+--------
+localGunSound=true
+recoil=0.375
+resethitcooldown=true
+
+laserSight=true
+laserSightAimOnly=true
+laserSightColor=#FF2020
+laserSightRange=80
+laserSightSize=0.22
+laserSightOffsetRight=0.32
+laserSightOffsetUp=-0.28
+laserSightOffsetForward=0.55

@@ -1,0 +1,36 @@
+gunName=&eMSR
+-------
+gunType=279
+ammoType=337
+ammoAmtNeeded=2
+bulletDelayTime=8
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=20
+maxDistance=400
+bulletSpeed=4.5
+accuracy=0.4
+accuracy_aimed=0.01
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=6
+reloadGunOnDrop=true
+reloadTime=85
+--------
+reloadType=BOLT
+recoil=0.3
+knockback=0
+localGunSound=true
+gunSound=irongolem hit,wither shoot
+resethitcooldown=true

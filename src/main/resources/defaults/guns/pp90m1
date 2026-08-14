@@ -1,0 +1,36 @@
+gunName=&ePP-90M1
+-------
+gunType=372
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=2
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=4
+maxDistance=70
+bulletSpeed=4
+accuracy=0.14
+accuracy_aimed=0.05
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=50
+reloadGunOnDrop=true
+reloadTime=80
+--------
+reloadType=NORMAL
+gunSound=skeleton hurt,zombie wood,ghast fireball
+localGunSound=true
+recoil=0.03
+knockback=0.1
+resethitcooldown=true

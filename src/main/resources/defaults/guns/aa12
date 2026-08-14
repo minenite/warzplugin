@@ -1,0 +1,35 @@
+gunName=&eAA12
+-------
+gunType=257
+ammoType=295
+ammoAmtNeeded=2
+bulletDelayTime=6
+-------
+roundsPerBurst=1
+bulletsPerClick=6
+gunDamage=2
+maxDistance=12
+bulletSpeed=3
+accuracy=0.175
+accuracy_aimed=0.17
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=20
+reloadGunOnDrop=true
+reloadTime=30
+--------
+reloadType=INDIVIDUAL_BULLET
+gunSound=ghast fireball,explode
+localGunSound=true
+recoil=0.08
+resethitcooldown=true

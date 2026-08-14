@@ -1,0 +1,35 @@
+gunName=&eDisassembler
+-------
+gunType=339
+ammoType=337
+ammoAmtNeeded=2
+bulletDelayTime=12
+reloadType=BOLT
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=24
+maxDistance=400
+bulletSpeed=4.35
+accuracy=0.4
+accuracy_aimed=0.002
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+gunSound=irongolem hit,wither shoot
+recoil=0.15
+--------
+hasClip=true
+maxClipSize=30
+reloadGunOnDrop=true
+reloadTime=60
+--------
+localGunSound=true
+resethitcooldown=true

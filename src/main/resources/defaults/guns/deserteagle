@@ -1,0 +1,36 @@
+gunName=&eDesert Eagle
+-------
+gunType=277
+ammoType=368
+ammoAmtNeeded=1
+bulletDelayTime=5
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=11
+maxDistance=38
+bulletSpeed=4
+accuracy=0.04
+accuracy_aimed=0.02
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=8
+reloadGunOnDrop=true
+reloadTime=60
+--------
+reloadType=NORMAL
+localGunSound=true
+gunSound=ghast fireball,zombie metal
+recoil=0.07
+knockback=3
+resethitcooldown=true

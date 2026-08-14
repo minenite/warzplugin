@@ -1,0 +1,33 @@
+gunName=&eGrenade
+-------
+gunType=341
+ammoType=SELF
+consumable=true
+ammoAmtNeeded=1
+bulletDelayTime=20
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=38
+maxDistance=0
+bulletSpeed=1.32
+accuracy=0
+-------
+canAim=false
+explodeRadius=4
+blastShockRadius=20
+blastShockStrength=1.0
+fireRadius=0
+explodeOnImpact=false
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&cYou need a Grenade!
+gunSound=shoot arrow
+needsPermission=false
+--------
+hasClip=false
+timeUntilRelease=80
+remnantItem=NONE
+resethitcooldown=true

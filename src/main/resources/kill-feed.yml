@@ -1,0 +1,21 @@
+# WarZ kill-feed — edit pools freely; /warz reload picks this up.
+# Placeholders: {killer} {victim} {gun}
+# Lines matching the shot context are filtered (scoped / point blank / afar).
+
+settings:
+  credit-ms: 12000
+  bleed-credit-ms: 300000
+  streak-window-ms: 10000
+  template-cooldown-ms: 18000
+  trickshot-fall-blocks: 3.0
+  sounds: true
+  toasts: true
+  range-point-blank: 5.0
+  range-close: 15.0
+  range-long: 45.0
+  range-extreme: 90.0
+
+# Optional pool overrides (omit a key to keep the built-in default).
+# pools:
+#   trickshot:
+#     - "&6{killer} &fnoscope trickshotted &6{victim} &fwith a &6{gun}"

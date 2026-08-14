@@ -21,6 +21,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
+import com.local.warz.runtime.ProfileStatsService;
+
 /** Persistent clans: create / invite / join / leave / promote / demote / admin. */
 public final class ClanService {
 
@@ -510,7 +512,59 @@ public final class ClanService {
         } else if (role == ClanRole.MOD) {
             style = "&o";
         }
+        String top = topKdrClanTag();
+        if (top != null && top.equals(clan.tag)) {
+            return "&6&k!&r&7" + style + clan.tag + "&r&6&k!&r ";
+        }
         return "&7[" + style + clan.tag + "&7] ";
+    }
+
+    public double combinedKdr(Clan clan) {
+        if (clan == null || plugin.profileStats() == null) {
+            return 0.0;
+        }
+        long kills = 0L;
+        long deaths = 0L;
+        for (UUID id : clan.members.keySet()) {
+            ProfileStatsService.Stats s = plugin.profileStats().get(id);
+            kills += s.playerKills;
+            deaths += s.pvpDeaths;
+        }
+        return ProfileStatsService.kdrValue(kills, deaths);
+    }
+
+    public long combinedKills(Clan clan) {
+        if (clan == null || plugin.profileStats() == null) {
+            return 0L;
+        }
+        long kills = 0L;
+        for (UUID id : clan.members.keySet()) {
+            kills += plugin.profileStats().get(id).playerKills;
+        }
+        return kills;
+    }
+
+    public String topKdrClanTag() {
+        Clan best = null;
+        double bestKdr = -1.0;
+        long bestKills = -1L;
+        for (Clan clan : clans.values()) {
+            long kills = combinedKills(clan);
+            double kdr = combinedKdr(clan);
+            if (kills <= 0L && kdr <= 0.0) {
+                continue;
+            }
+            if (best == null
+                    || kdr > bestKdr + 1.0e-9
+                    || (Math.abs(kdr - bestKdr) <= 1.0e-9 && kills > bestKills)
+                    || (Math.abs(kdr - bestKdr) <= 1.0e-9 && kills == bestKills
+                    && clan.tag.compareTo(best.tag) < 0)) {
+                best = clan;
+                bestKdr = kdr;
+                bestKills = kills;
+            }
+        }
+        return best == null ? null : best.tag;
     }
 
     public List<Map.Entry<UUID, ClanRole>> sortedMembers(Clan clan) {

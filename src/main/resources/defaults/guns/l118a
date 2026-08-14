@@ -1,0 +1,36 @@
+gunName=&eL118a
+-------
+gunType=271
+ammoType=337
+ammoAmtNeeded=1
+bulletDelayTime=17
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=25
+maxDistance=400
+bulletSpeed=4.5
+accuracy=0.4
+accuracy_aimed=0.015
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=5
+reloadGunOnDrop=true
+reloadTime=80
+--------
+reloadType=BOLT
+recoil=0.5
+knockback=0
+localGunSound=true
+gunSound=irongolem hit,wither shoot
+resethitcooldown=true

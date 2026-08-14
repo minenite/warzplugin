@@ -1,0 +1,36 @@
+gunName=&eMP7
+-------
+gunType=377
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=2
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=5
+maxDistance=74
+bulletSpeed=4
+accuracy=0.09
+accuracy_aimed=0.04
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=20
+reloadGunOnDrop=true
+reloadTime=60
+--------
+reloadType=NORMAL
+gunSound=skeleton hurt,zombie wood,ghast fireball
+localGunSound=true
+recoil=0.0225
+knockback=0.1
+resethitcooldown=true

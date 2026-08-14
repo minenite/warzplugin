@@ -141,9 +141,21 @@ public final class ScoreboardService implements Listener {
 
     public void giveScubaSet(Player player) {
         PlayerInventory inv = player.getInventory();
-        inv.addItem(createScubaHelmet(), createScubaTank(), createWetsuitLeggings(),
-                createWetsuitBoots(), createBandage(8));
-        player.sendMessage(ChatColor.AQUA + "Scuba set + bandages given.");
+        if (plugin.items() != null) {
+            inv.addItem(
+                    plugin.items().createScubaHelmet(),
+                    plugin.items().createScubaTank(),
+                    plugin.items().createWetsuitLeggings(),
+                    plugin.items().createWetsuitBoots(),
+                    plugin.items().createBandage(8),
+                    plugin.items().createSplint(4),
+                    plugin.items().createTourniquet(2),
+                    plugin.items().createBloodBag(2));
+        } else {
+            inv.addItem(createScubaHelmet(), createScubaTank(), createWetsuitLeggings(),
+                    createWetsuitBoots(), createBandage(8));
+        }
+        player.sendMessage(ChatColor.AQUA + "Scuba set + medical given.");
     }
 
     /* -------------------- gear -------------------- */
@@ -177,6 +189,9 @@ public final class ScoreboardService implements Listener {
     }
 
     public ItemStack createBandage(int amount) {
+        if (plugin.items() != null) {
+            return plugin.items().createBandage(amount);
+        }
         ItemStack stack = new ItemStack(Material.PAPER, Math.max(1, amount));
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(gearKey, PersistentDataType.STRING, BANDAGE);
@@ -243,61 +258,6 @@ public final class ScoreboardService implements Listener {
     }
 
     private void tickPlayer(Player player, boolean updateBoard, boolean second) {
-        GameMode mode = player.getGameMode();
-        if (mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR) {
-            bodyTemp.put(player.getUniqueId(), NORMAL_TEMP_F);
-            bloodLiters.put(player.getUniqueId(), MAX_BLOOD_L);
-            thirst.put(player.getUniqueId(), MAX_THIRST);
-            bleeding.remove(player.getUniqueId());
-            clearFreezeIfOurs(player);
-            if (updateBoard) {
-                updateSidebar(player);
-            }
-            return;
-        }
-        if (player.isDead()) {
-            return;
-        }
-
-        PlayerInventory inv = player.getInventory();
-        boolean helmet = isScubaHelmet(inv.getHelmet());
-        boolean tank = isScubaTank(inv.getChestplate());
-        boolean wetsuit = isWetsuitLeggings(inv.getLeggings()) && isWetsuitBoots(inv.getBoots());
-
-        if (helmet && tank && (player.isUnderWater() || eyeInWater(player))) {
-            player.setRemainingAir(player.getMaximumAir());
-        }
-
-        double temp = ensureTemp(player);
-        boolean wet = player.isInWater() || player.isUnderWater() || player.isInWaterOrBubbleColumn();
-        if (wet && !wetsuit) {
-            temp -= COOL_PER_TICK;
-        } else {
-            temp += WARM_PER_TICK;
-        }
-        temp = clamp(temp, MIN_TEMP_F, NORMAL_TEMP_F);
-        bodyTemp.put(player.getUniqueId(), temp);
-        applyFreezeOverlay(player, temp);
-
-        if (temp < DAMAGE_TEMP_F) {
-            int cd = coldDamageCd.getOrDefault(player.getUniqueId(), 0);
-            if (cd > 0) {
-                coldDamageCd.put(player.getUniqueId(), cd - 1);
-            } else {
-                player.damage(COLD_DAMAGE);
-                player.sendActionBar(ChatColor.AQUA + "Hypothermia… " + ChatColor.GRAY
-                        + "Wear a " + ChatColor.DARK_AQUA + "Wetsuit");
-                coldDamageCd.put(player.getUniqueId(), COLD_DAMAGE_INTERVAL);
-            }
-        } else {
-            coldDamageCd.remove(player.getUniqueId());
-        }
-
-        if (second) {
-            tickBloodSecond(player);
-            tickThirstSecond(player);
-        }
-
         if (updateBoard) {
             updateSidebar(player);
         }
@@ -365,9 +325,9 @@ public final class ScoreboardService implements Listener {
             board.resetScores(entry);
         }
 
-        double tempF = ensureTemp(player);
-        double blood = ensureBlood(player);
-        double thirstVal = ensureThirst(player);
+        double tempF = plugin.scuba() != null ? plugin.scuba().bodyTemp(player) : NORMAL_TEMP_F;
+        double blood = plugin.medical() != null ? plugin.medical().bloodLiters(player) : MAX_BLOOD_L;
+        double thirstVal = plugin.thirst() != null ? plugin.thirst().thirst(player) : MAX_THIRST;
         String deg = color(String.format(Locale.US, "%s%.1f\u00B0F", tempColor(tempF), tempF));
         String bloodLine = color(String.format(Locale.US, "%sBlood: %.1fL", bloodColor(blood), blood));
         String thirstLine = color(String.format(Locale.US, "%sThirst: %.0f%%", thirstColor(thirstVal), thirstVal));
@@ -482,61 +442,6 @@ public final class ScoreboardService implements Listener {
 
     /* -------------------- events -------------------- */
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDamage(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player player)) {
-            return;
-        }
-        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) {
-            return;
-        }
-        double loss = Math.max(0.05, event.getFinalDamage() * 0.12);
-        double blood = clamp(ensureBlood(player) - loss, 0.0, MAX_BLOOD_L);
-        bloodLiters.put(player.getUniqueId(), blood);
-        if (ThreadLocalRandom.current().nextDouble() < 0.35
-                || event.getFinalDamage() >= 4.0) {
-            bleeding.put(player.getUniqueId(), true);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onConsume(PlayerItemConsumeEvent event) {
-        ItemStack item = event.getItem();
-        Material type = item.getType();
-        if (type != Material.POTION && type != Material.HONEY_BOTTLE && type != Material.MILK_BUCKET) {
-            return;
-        }
-        Player player = event.getPlayer();
-        double add = type == Material.HONEY_BOTTLE ? 25.0 : type == Material.MILK_BUCKET ? 15.0 : 35.0;
-        thirst.put(player.getUniqueId(), clamp(ensureThirst(player) + add, 0.0, MAX_THIRST));
-    }
-
-    @EventHandler
-    public void onInteract(org.bukkit.event.player.PlayerInteractEvent event) {
-        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) {
-            return;
-        }
-        org.bukkit.event.block.Action action = event.getAction();
-        if (action != org.bukkit.event.block.Action.RIGHT_CLICK_AIR
-                && action != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-            return;
-        }
-        Player player = event.getPlayer();
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        if (!isBandage(hand)) {
-            return;
-        }
-        event.setCancelled(true);
-        if (!Boolean.TRUE.equals(bleeding.get(player.getUniqueId()))) {
-            player.sendMessage(ChatColor.GRAY + "You're not bleeding.");
-            return;
-        }
-        bleeding.remove(player.getUniqueId());
-        hand.setAmount(hand.getAmount() - 1);
-        player.sendMessage(ChatColor.GREEN + "Bleeding stopped.");
-        player.sendActionBar(ChatColor.GREEN + "Bandaged");
-    }
-
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -551,24 +456,13 @@ public final class ScoreboardService implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         boards.remove(id);
-        coldDamageCd.remove(id);
-        bodyTemp.remove(id);
-        bloodLiters.remove(id);
-        thirst.remove(id);
-        bleeding.remove(id);
         event.getPlayer().setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
-        bodyTemp.put(player.getUniqueId(), NORMAL_TEMP_F);
-        bloodLiters.put(player.getUniqueId(), MAX_BLOOD_L);
-        thirst.put(player.getUniqueId(), MAX_THIRST);
-        bleeding.remove(player.getUniqueId());
-        coldDamageCd.remove(player.getUniqueId());
         Bukkit.getScheduler().runTask(plugin, () -> {
-            clearFreezeIfOurs(player);
             attachBoard(player);
             updateSidebar(player);
         });

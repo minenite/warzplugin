@@ -1,0 +1,36 @@
+gunName=&eM16
+-------
+gunType=290
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=5
+-------
+roundsPerBurst=3
+bulletsPerClick=1
+gunDamage=6
+maxDistance=76
+bulletSpeed=4.5
+accuracy=0.15
+accuracy_aimed=0.01
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=30
+reloadGunOnDrop=true
+reloadTime=85
+--------
+reloadType=NORMAL
+gunSound=note snare drum,item break,ghast fireball
+localGunSound=true
+recoil=0.035
+knockback=0.2
+resethitcooldown=true

@@ -10,8 +10,12 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.Material;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
@@ -24,7 +28,10 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import com.destroystokyo.paper.event.player.PlayerPostRespawnEvent;
 
 /**
  * Features that belong only on warz, not on the rest of the network.
@@ -43,10 +50,16 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private LootRestockService lootRestock;
     private ClanService clans;
     private ClanGuiService clanGui;
+    private ProfileGuiService profileGui;
     private ScoreboardService scoreboard;
     private HumanityService humanity;
     private WorldMapService worldMap;
     private WorldFreezeListener worldFreeze;
+    private TransientBlocksService transientBlocks;
+    private ZombieAmbientSpawnService zombieSpawns;
+    private FacingBossBarService facingBossBar;
+    private SaplingItemCleanupService saplingItems;
+    private GunEngine guns;
     private final Random random = ThreadLocalRandom.current();
 
     @Override
@@ -73,6 +86,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.clans = new ClanService(this);
         this.clans.load();
         this.clanGui = new ClanGuiService(this);
+        this.profileGui = new ProfileGuiService(this);
         this.humanity = new HumanityService(this);
         this.scoreboard = new ScoreboardService(this);
         if (getConfig().getBoolean("world-map.enabled", true)) {
@@ -84,7 +98,8 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this.lootRestock, this);
-        getServer().getPluginManager().registerEvents(new ClanGuiListener(), this);
+        getServer().getPluginManager().registerEvents(new ClanGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new ProfileGuiListener(this), this);
         getServer().getPluginManager().registerEvents(this.humanity, this);
         getServer().getPluginManager().registerEvents(this.scoreboard, this);
         if (this.worldMap != null) {
@@ -94,6 +109,33 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         this.worldFreeze = new WorldFreezeListener(this);
         if (this.worldFreeze.isEnabled()) {
             getServer().getPluginManager().registerEvents(this.worldFreeze, this);
+        }
+        this.transientBlocks = new TransientBlocksService(this);
+        if (this.transientBlocks.isEnabled()) {
+            getServer().getPluginManager().registerEvents(this.transientBlocks, this);
+            // After worlds are fully available: undo leftover session edits.
+            getServer().getScheduler().runTask(this, this.transientBlocks::restoreFromDisk);
+            this.transientBlocks.start();
+        }
+        SpawnRestrictListener spawnRestrict = new SpawnRestrictListener(this);
+        getServer().getPluginManager().registerEvents(spawnRestrict, this);
+        this.guns = new GunEngine(this);
+        this.guns.start(this);
+        getServer().getScheduler().runTask(this, spawnRestrict::purgeWorlds);
+        this.zombieSpawns = new ZombieAmbientSpawnService(this);
+        if (this.zombieSpawns.isEnabled()) {
+            this.zombieSpawns.start();
+        }
+        this.facingBossBar = new FacingBossBarService(this);
+        if (this.facingBossBar.isEnabled()) {
+            getServer().getPluginManager().registerEvents(this.facingBossBar, this);
+            this.facingBossBar.start();
+        }
+        applyInstantRespawnToLoadedWorlds();
+        this.saplingItems = new SaplingItemCleanupService(this);
+        if (this.saplingItems.isEnabled()) {
+            getServer().getPluginManager().registerEvents(this.saplingItems, this);
+            this.saplingItems.start();
         }
         this.lootRestock.start();
         this.humanity.start();
@@ -107,11 +149,37 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + ", " + this.clans.allClans().size() + " clan(s)"
                 + (this.worldMap != null ? ", world map on" : "")
                 + (this.worldFreeze != null && this.worldFreeze.isEnabled()
-                        ? ", world freeze on" : ""));
+                        ? ", world freeze on" : "")
+                + (this.transientBlocks != null && this.transientBlocks.isEnabled()
+                        ? ", transient blocks on" : "")
+                + (this.zombieSpawns != null && this.zombieSpawns.isEnabled()
+                        ? ", ambient zombies on" : "")
+                + (this.facingBossBar != null && this.facingBossBar.isEnabled()
+                        ? ", compass boss bar on" : "")
+                + (isInstantRespawnEnabled() ? ", instant respawn on" : "")
+                + (this.saplingItems != null && this.saplingItems.isEnabled()
+                        ? ", sapling item despawn on" : "")
+                + ", zombie-only spawns"
+                + (this.guns != null ? ", guns/workbench/lasers on" : ""));
     }
 
     @Override
     public void onDisable() {
+        if (this.guns != null) {
+            this.guns.stop();
+        }
+        if (this.saplingItems != null) {
+            this.saplingItems.stop();
+        }
+        if (this.facingBossBar != null) {
+            this.facingBossBar.stop();
+        }
+        if (this.zombieSpawns != null) {
+            this.zombieSpawns.stop();
+        }
+        if (this.transientBlocks != null) {
+            this.transientBlocks.stop();
+        }
         if (this.scoreboard != null) {
             this.scoreboard.stop();
         }
@@ -130,12 +198,238 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         return this.lootRestock;
     }
 
+    public void reloadGuns() {
+        reloadConfig();
+        if (guns == null) {
+            return;
+        }
+        if (guns.rounds != null) {
+            guns.rounds.reload();
+        }
+        guns.registry.reload();
+        guns.sessions.rebuildAll();
+        if (guns.explosionRegen != null) {
+            guns.explosionRegen.reloadFromConfig();
+        }
+        if (guns.killFeed != null) {
+            guns.killFeed.reload();
+        }
+        if (guns.companions != null) {
+            guns.companions.unregister();
+            guns.companions.register();
+        }
+    }
+
+    public com.local.warz.config.GunRegistry registry() {
+        return guns == null ? null : guns.registry;
+    }
+
+    public com.local.warz.config.RoundRegistry rounds() {
+        return guns == null ? null : guns.rounds;
+    }
+
+    public com.local.warz.runtime.SessionManager sessions() {
+        return guns == null ? null : guns.sessions;
+    }
+
+    public com.local.warz.projectile.BulletManager bullets() {
+        return guns == null ? null : guns.bullets;
+    }
+
+    public com.local.warz.runtime.ItemFactory items() {
+        return guns == null ? null : guns.items;
+    }
+
+    public com.local.warz.gui.GunEditorService editor() {
+        return guns == null ? null : guns.editor;
+    }
+
+    public com.local.warz.gui.GiveGunMenuService giveMenu() {
+        return guns == null ? null : guns.giveMenu;
+    }
+
+    public com.local.warz.runtime.CompanionClients companions() {
+        return guns == null ? null : guns.companions;
+    }
+
+    public com.local.warz.runtime.LaserCompanionBridge laserBridge() {
+        return guns == null ? null : guns.laserBridge;
+    }
+
+    public com.local.warz.runtime.FlashlightService flashlight() {
+        return guns == null ? null : guns.flashlight;
+    }
+
+    public com.local.warz.runtime.PeqService peq() {
+        return guns == null ? null : guns.peq;
+    }
+
+    public com.local.warz.runtime.BigDroneService bigDrone() {
+        return guns == null ? null : guns.bigDrone;
+    }
+
+    public com.local.warz.runtime.DroneStrikeEffects strikeEffects() {
+        return guns == null ? null : guns.strikeEffects;
+    }
+
+    public com.local.warz.runtime.DroneSeatService droneSeats() {
+        return guns == null ? null : guns.droneSeats;
+    }
+
+    public com.local.warz.runtime.DroneDatalinkService datalink() {
+        return guns == null ? null : guns.datalink;
+    }
+
+    public com.local.warz.gui.WarzCreateMenuService createMenu() {
+        return guns == null ? null : guns.createMenu;
+    }
+
+    public com.local.warz.runtime.DronePadService dronePads() {
+        return guns == null ? null : guns.dronePads;
+    }
+
+    public com.local.warz.runtime.DroneMeshPoseService droneMeshPose() {
+        return guns == null ? null : guns.droneMeshPose;
+    }
+
+    public com.local.warz.runtime.JavelinService javelin() {
+        return guns == null ? null : guns.javelin;
+    }
+
+    public com.local.warz.runtime.WeatherService weather() {
+        return guns == null ? null : guns.weather;
+    }
+
+    public com.local.warz.runtime.ProneService prone() {
+        return guns == null ? null : guns.prone;
+    }
+
+    public com.local.warz.runtime.GunPoseSync gunPoses() {
+        return guns == null ? null : guns.gunPoses;
+    }
+
+    public com.local.warz.runtime.ScopeSync scopeSync() {
+        return guns == null ? null : guns.scopeSync;
+    }
+
+    public com.local.warz.runtime.SmokeService smoke() {
+        return guns == null ? null : guns.smoke;
+    }
+
+    public com.local.warz.runtime.FlareService flares() {
+        return guns == null ? null : guns.flares;
+    }
+
+    public com.local.warz.runtime.GunWorkbenchService workbenches() {
+        return guns == null ? null : guns.workbenches;
+    }
+
+    public com.local.warz.runtime.GlassService glass() {
+        return guns == null ? null : guns.glass;
+    }
+
+    public com.local.warz.gui.GunWorkbenchGui workbenchGui() {
+        return guns == null ? null : guns.workbenchGui;
+    }
+
+    public com.local.warz.runtime.MedicalService medical() {
+        return guns == null ? null : guns.medical;
+    }
+
+    public com.local.warz.runtime.ScubaService scuba() {
+        return guns == null ? null : guns.scuba;
+    }
+
+    public com.local.warz.runtime.KillFeedService killFeed() {
+        return guns == null ? null : guns.killFeed;
+    }
+
+    public com.local.warz.runtime.RazorWireService razorWire() {
+        return guns == null ? null : guns.razorWire;
+    }
+
+    public com.local.warz.runtime.ChainlinkService chainlink() {
+        return guns == null ? null : guns.chainlink;
+    }
+
+    public com.local.warz.runtime.CorpseService corpses() {
+        return guns == null ? null : guns.corpses;
+    }
+
+    public com.local.warz.runtime.ThirstService thirst() {
+        return guns == null ? null : guns.thirst;
+    }
+
+    public com.local.warz.runtime.InfectionService infection() {
+        return guns == null ? null : guns.infection;
+    }
+
+    public com.local.warz.runtime.HydrazineService hydrazine() {
+        return guns == null ? null : guns.hydrazine;
+    }
+
+    public com.local.warz.runtime.WaterService water() {
+        return guns == null ? null : guns.water;
+    }
+
+    public com.local.warz.runtime.ProfileStatsService profileStats() {
+        return guns == null ? null : guns.profileStats;
+    }
+
+    public com.local.warz.runtime.GrappleService grapple() {
+        return guns == null ? null : guns.grapple;
+    }
+
+    public com.local.warz.runtime.ExplosionRegenService explosionRegen() {
+        return guns == null ? null : guns.explosionRegen;
+    }
+
+    public com.local.warz.runtime.CrashSiteService crashSites() {
+        return guns == null ? null : guns.crashSites;
+    }
+
+    public com.local.warz.runtime.BlastShockService blastShock() {
+        return guns == null ? null : guns.blastShock;
+    }
+
+    public com.local.warz.runtime.GroundEmergeListener groundEmerge() {
+        return guns == null ? null : guns.groundEmerge;
+    }
+
+    public com.local.warz.runtime.anomaly.AnomalyService anomalies() {
+        return guns == null ? null : guns.anomalies;
+    }
+
+    public com.local.warz.runtime.NvgListener nvgListener() {
+        return guns == null ? null : guns.nvgListener;
+    }
+
+    public com.local.warz.runtime.LavaHeatService lavaHeat() {
+        return guns == null ? null : guns.lavaHeat;
+    }
+
+    public com.local.warz.runtime.LongProngsService longProngs() {
+        return guns == null ? null : guns.longProngs;
+    }
+
+    public com.local.warz.runtime.RestraintService restraints() {
+        return guns == null ? null : guns.restraints;
+    }
+
+    public RankStore ranks() {
+        return this.ranks;
+    }
+
     public ClanService clans() {
         return this.clans;
     }
 
     public ClanGuiService clanGui() {
         return this.clanGui;
+    }
+
+    public ProfileGuiService profileGui() {
+        return this.profileGui;
     }
 
     public ScoreboardService scoreboard() {
@@ -219,6 +513,8 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
             return;
         }
 
+        // /tag is owned by ServerPlugin (display rank). Do not intercept it here.
+
         if (label.equals("/warz") || label.equals("/wz")) {
             event.setCancelled(true);
             handleWarz(event.getPlayer(), parts);
@@ -234,6 +530,12 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         if (label.equals("/clan") || label.equals("/c")) {
             event.setCancelled(true);
             handleClan(event.getPlayer(), parts);
+            return;
+        }
+
+        if (label.equals("/profile") || label.equals("/stats")) {
+            event.setCancelled(true);
+            handleProfile(event.getPlayer(), parts);
         }
     }
 
@@ -433,6 +735,24 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    private void handleProfile(Player player, String[] parts) {
+        if (this.profileGui == null || profileStats() == null) {
+            player.sendMessage(ChatColor.RED + "Profile system is not ready.");
+            return;
+        }
+        OfflinePlayer subject;
+        if (parts.length < 2) {
+            subject = player;
+        } else {
+            subject = profileStats().resolvePlayer(parts[1]);
+            if (subject == null) {
+                player.sendMessage(ChatColor.RED + "Unknown player: " + ChatColor.WHITE + parts[1]);
+                return;
+            }
+        }
+        this.profileGui.open(player, subject);
+    }
+
     private void sendClanHelp(Player player) {
         player.sendMessage(ClanService.color("&5Clan commands:"));
         player.sendMessage(ClanService.color("&7/clan &8— &fyour clan GUI"));
@@ -475,6 +795,9 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     private void handleWarz(Player player, String[] parts) {
         if (parts.length < 2) {
             sendWarzHelp(player);
+            if (this.guns != null) {
+                this.guns.handleWarz(player, new String[0]);
+            }
             return;
         }
         String sub = parts[1].toLowerCase(Locale.ROOT);
@@ -535,8 +858,13 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
             }
             case "map" -> giveWorldMap(player);
             default -> {
-                player.sendMessage(ChatColor.RED + "Unknown subcommand. Try /warz");
-                sendWarzHelp(player);
+                if (this.guns != null) {
+                    String[] args = java.util.Arrays.copyOfRange(parts, 1, parts.length);
+                    this.guns.handleWarz(player, args);
+                } else {
+                    player.sendMessage(ChatColor.RED + "Unknown subcommand. Try /warz");
+                    sendWarzHelp(player);
+                }
             }
         }
     }
@@ -572,6 +900,13 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + ChatColor.WHITE + " get the full-server overview map");
         player.sendMessage(ChatColor.GREEN + "/reloot"
                 + ChatColor.WHITE + " restock all chests and reset the 600s timer");
+        player.sendMessage(ChatColor.GOLD + "---- Guns ----");
+        player.sendMessage(ChatColor.GREEN + "/warz give <gun>"
+                + ChatColor.WHITE + " give a stick-gun");
+        player.sendMessage(ChatColor.GREEN + "/warz menu"
+                + ChatColor.WHITE + " guns / ammo / attachments GUI");
+        player.sendMessage(ChatColor.GREEN + "/warz list"
+                + ChatColor.WHITE + " list loaded guns");
     }
 
     // ----------------------------------------------------------------- speed
@@ -623,15 +958,30 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (player.hasPlayedBefore() || this.firstJoinSpawn == null) {
-            return;
+        boolean firstJoin = !player.hasPlayedBefore();
+        if (firstJoin && this.firstJoinSpawn != null) {
+            Location dest = this.firstJoinSpawn.clone();
+            getServer().getScheduler().runTaskLater(this, () -> {
+                if (player.isOnline()) {
+                    player.teleport(dest);
+                }
+            }, 1L);
         }
-        Location dest = this.firstJoinSpawn.clone();
-        getServer().getScheduler().runTaskLater(this, () -> {
-            if (player.isOnline()) {
-                player.teleport(dest);
-            }
-        }, 1L);
+        if (firstJoin) {
+            java.util.UUID id = player.getUniqueId();
+            getServer().getScheduler().runTaskLater(this, () -> {
+                Player p = getServer().getPlayer(id);
+                if (p != null) {
+                    ensureStarterKit(p);
+                }
+            }, 2L);
+            getServer().getScheduler().runTaskLater(this, () -> {
+                Player p = getServer().getPlayer(id);
+                if (p != null) {
+                    ensureStarterKit(p);
+                }
+            }, 5L);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -642,20 +992,200 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
         } else if (this.firstJoinSpawn != null) {
             event.setRespawnLocation(this.firstJoinSpawn.clone());
         }
+        // Kit is NOT given here: CardForge fires this before creating the new
+        // ServerPlayer. Giving items would hit the soon-to-be-discarded inventory.
+    }
+
+    /**
+     * Starter knife + USP + medical + water + map + compass after the new player
+     * entity exists (CardForge respawn).
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPostRespawnGiveKit(PlayerPostRespawnEvent event) {
         Player player = event.getPlayer();
-        // Hotbar slot 5 = inventory index 4. Run next tick so the inventory exists.
-        if (this.worldMap != null && this.worldMap.isLoaded()) {
-            getServer().getScheduler().runTask(this, () -> {
-                if (player.isOnline()) {
-                    this.worldMap.giveMap(player, 4);
-                }
-            });
+        java.util.UUID id = player.getUniqueId();
+        ensureStarterKit(player);
+        getServer().getScheduler().runTaskLater(this, () -> {
+            Player p = getServer().getPlayer(id);
+            if (p != null) {
+                ensureStarterKit(p);
+            }
+        }, 2L);
+        getServer().getScheduler().runTaskLater(this, () -> {
+            Player p = getServer().getPlayer(id);
+            if (p != null) {
+                ensureStarterKit(p);
+            }
+        }, 5L);
+    }
+
+    /**
+     * Hotbar: 0 knife, 1 USP-45, 2 bandages×4, 3 beans×4, 4 map, 5 splints×2,
+     * 6 water×2, 7 pasta×2, 8 compass.
+     * Inv: slot above USP (10) = full 9mm mag; top-right (35) = blood bag.
+     * Idempotent — only fills missing / wrong slots.
+     */
+    private void ensureStarterKit(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
         }
+        var inv = player.getInventory();
+        ItemStack slot0 = inv.getItem(0);
+        if (slot0 == null || slot0.getType() != Material.WOODEN_SWORD) {
+            giveWoodenKnife(player, 0);
+        }
+
+        var items = items();
+        var registry = registry();
+        if (items != null && registry != null) {
+            ItemStack slot1 = inv.getItem(1);
+            if (!isStarterUsp(slot1)) {
+                registry.get("usp45").ifPresent(def -> inv.setItem(1, items.create(def, 1)));
+            }
+
+            // Slot directly above hotbar slot 1.
+            final int magSlot = 1 + 9;
+            ItemStack aboveGun = inv.getItem(magSlot);
+            if (!isStarterLoaded9mmMag(aboveGun)) {
+                inv.setItem(magSlot, items.createMagazine(
+                        com.local.warz.runtime.MagazineType.PISTOL_15,
+                        com.local.warz.runtime.MagazineType.PISTOL_15.capacity(),
+                        "pistol_fmj",
+                        1));
+            }
+
+            ItemStack slot2 = inv.getItem(2);
+            if (!items.isBandage(slot2) || slot2.getAmount() < 4) {
+                inv.setItem(2, items.createBandage(4));
+            }
+
+            ItemStack slot3 = inv.getItem(3);
+            if (items.foodType(slot3) != com.local.warz.runtime.WarzFoodType.CANNED_BEANS
+                    || slot3.getAmount() < 4) {
+                inv.setItem(3, items.createFood(com.local.warz.runtime.WarzFoodType.CANNED_BEANS, 4));
+            }
+
+            ItemStack slot5 = inv.getItem(5);
+            if (!items.isSplint(slot5) || slot5.getAmount() < 2) {
+                inv.setItem(5, items.createSplint(2));
+            }
+
+            ItemStack slot6 = inv.getItem(6);
+            if (items.drinkType(slot6) != com.local.warz.runtime.DrinkType.WATER
+                    || slot6.getAmount() < 2) {
+                inv.setItem(6, items.createDrink(com.local.warz.runtime.DrinkType.WATER, 2));
+            }
+
+            ItemStack slot7 = inv.getItem(7);
+            if (items.foodType(slot7) != com.local.warz.runtime.WarzFoodType.CANNED_PASTA
+                    || slot7.getAmount() < 2) {
+                inv.setItem(7, items.createFood(com.local.warz.runtime.WarzFoodType.CANNED_PASTA, 2));
+            }
+
+            ItemStack topRight = inv.getItem(35);
+            if (!items.isBloodBag(topRight)) {
+                inv.setItem(35, items.createBloodBag(1));
+            }
+        }
+
+        ItemStack slot4 = inv.getItem(4);
+        boolean needMap = slot4 == null || slot4.getType() != Material.FILLED_MAP;
+        if (needMap && this.worldMap != null && this.worldMap.isLoaded()) {
+            this.worldMap.giveMap(player, 4);
+        }
+        ItemStack slot8 = inv.getItem(8);
+        if (slot8 == null || slot8.getType() != Material.COMPASS) {
+            giveStarterCompass(player, 8);
+        } else if (FacingBossBarService.pointTrueNorth(slot8, player.getWorld())) {
+            inv.setItem(8, slot8);
+        }
+        player.updateInventory();
+    }
+
+    private boolean isStarterUsp(ItemStack stack) {
+        if (items() == null || stack == null) {
+            return false;
+        }
+        return items().gunId(stack).filter(id -> "usp45".equalsIgnoreCase(id)).isPresent();
+    }
+
+    private boolean isStarterLoaded9mmMag(ItemStack stack) {
+        if (items() == null || stack == null || !items().isMagazine(stack)) {
+            return false;
+        }
+        if (items().magazineType(stack) != com.local.warz.runtime.MagazineType.PISTOL_15) {
+            return false;
+        }
+        return items().magazineCount(stack) > 0;
+    }
+
+    /** Puts a north-seeking compass in a hotbar slot (replaces that slot only). */
+    private void giveStarterCompass(Player player, int hotbarSlot) {
+        player.getInventory().setItem(hotbarSlot, FacingBossBarService.northCompass(player.getWorld()));
+    }
+
+    /** Puts a styled wooden sword in a hotbar slot (replaces that slot only). */
+    private void giveWoodenKnife(Player player, int hotbarSlot) {
+        ItemStack knife = new ItemStack(Material.WOODEN_SWORD);
+        ItemMeta meta = knife.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', "&7&oWooden Knife"));
+            knife.setItemMeta(meta);
+        }
+        player.getInventory().setItem(hotbarSlot, knife);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeath(PlayerDeathEvent event) {
+        // Never spawn XP orbs, and do not strip the player's levels (loot timer
+        // uses the XP bar). Applies to /kill, PvP, mobs, void — every death.
         event.setDroppedExp(0);
+        event.setShouldDropExperience(false);
+        event.setKeepLevel(true);
+
+        // Belt-and-suspenders with doImmediateRespawn: if the client still sits
+        // on the death screen (lag / missed game-event), force a server respawn.
+        // Delay past the starter-kit grants so a late force-respawn cannot wipe them.
+        if (!isInstantRespawnEnabled()) {
+            return;
+        }
+        Player player = event.getEntity();
+        java.util.UUID id = player.getUniqueId();
+        getServer().getScheduler().runTaskLater(this, () -> {
+            Player p = getServer().getPlayer(id);
+            if (p != null && p.isOnline() && p.getHealth() <= 0.0) {
+                p.spigot().respawn();
+            }
+        }, 10L);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onWorldLoad(WorldLoadEvent event) {
+        applyInstantRespawn(event.getWorld());
+    }
+
+    private boolean isInstantRespawnEnabled() {
+        return getConfig().getBoolean("instant-respawn", true);
+    }
+
+    private void applyInstantRespawnToLoadedWorlds() {
+        if (!isInstantRespawnEnabled()) {
+            return;
+        }
+        for (World world : getServer().getWorlds()) {
+            applyInstantRespawn(world);
+        }
+    }
+
+    private void applyInstantRespawn(World world) {
+        if (!isInstantRespawnEnabled()) {
+            return;
+        }
+        Boolean current = world.getGameRuleValue(GameRule.DO_IMMEDIATE_RESPAWN);
+        if (Boolean.TRUE.equals(current)) {
+            return;
+        }
+        world.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
     }
 
     private void setFirstJoinSpawn(Player actor) {

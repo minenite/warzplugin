@@ -1,0 +1,36 @@
+gunName=&eSpas-24
+-------
+gunType=280
+ammoType=295
+ammoAmtNeeded=2
+bulletDelayTime=18
+-------
+roundsPerBurst=1
+bulletsPerClick=8
+gunDamage=4
+maxDistance=21
+bulletSpeed=3.5
+accuracy=0.165
+accuracy_aimed=0.165
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=false
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=8
+reloadGunOnDrop=true
+reloadTime=80
+--------
+reloadType=PUMP
+gunSound=ghast fireball,explode
+localGunSound=true
+recoil=0.35
+knockback=0
+resethitcooldown=true

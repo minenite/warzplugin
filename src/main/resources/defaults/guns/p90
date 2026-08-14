@@ -1,0 +1,36 @@
+gunName=&eP90
+-------
+gunType=371
+ammoType=318
+ammoAmtNeeded=1
+bulletDelayTime=2
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=5
+maxDistance=76
+bulletSpeed=4
+accuracy=0.1
+accuracy_aimed=0.035
+-------
+canAim=true
+explodeRadius=0
+fireRadius=0
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&7Out of ammo!
+needsPermission=false
+--------
+hasClip=true
+maxClipSize=40
+reloadGunOnDrop=true
+reloadTime=70
+--------
+reloadType=NORMAL
+gunSound=skeleton hurt,zombie wood,ghast fireball
+localGunSound=true
+recoil=0.035
+knockback=0.1
+resethitcooldown=true

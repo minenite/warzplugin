@@ -1,0 +1,34 @@
+gunName=&eFlashBang
+-------
+gunType=289
+ammoType=SELF
+consumable=true
+ammoAmtNeeded=1
+bulletDelayTime=20
+-------
+roundsPerBurst=1
+bulletsPerClick=1
+gunDamage=30
+maxDistance=0
+bulletSpeed=1.42
+accuracy=0
+-------
+canAim=false
+flashRadius=12
+explodeOnImpact=false
+canHeadshot=true
+canClickLeft=true
+canClickRight=true
+--------
+outOfAmmoMessage=&cYou need a FlashBang!
+gunSound=shoot arrow
+needsPermission=false
+--------
+hasClip=false
+timeUntilRelease=80
+remnantItem=IRON_NUGGET
+remnantName=&8Used FlashBang
+remnantAmount=1
+remnantPickupDelay=10
+remnantLifetime=6000
+resethitcooldown=true
