@@ -1954,9 +1954,19 @@ public final class ItemFactory {
         if (stack == null || stack.getType().isAir()) {
             return;
         }
+        int wanted = Math.max(1, Math.min(99, max));
         try {
-            stack.setData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE,
-                    Math.max(1, Math.min(99, max)));
+            if (wanted == stack.getType().getMaxStackSize()) {
+                // Carrying the component is not the same as not carrying it, even
+                // when the number matches: components are part of an item's
+                // identity, so a round stamped "max 64" will not merge with an
+                // identical round that simply inherits 64 from its material. That
+                // is how stacking broke - two piles of the same ammo sitting side
+                // by side, and shift-click refusing to combine them.
+                stack.unsetData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE);
+                return;
+            }
+            stack.setData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE, wanted);
         } catch (Throwable ignored) {
         }
     }
@@ -4242,14 +4252,29 @@ public final class ItemFactory {
             return null;
         }
         if (mag.getAmount() > 1 && magazineCount(mag) <= 0) {
+            // One magazine has to come off the stack before it can be loaded, and
+            // the leftovers must not be handed back through the inventory: they are
+            // identical empties, so they merge straight back into this slot and the
+            // rounds then go into a stack of two - which is why both magazines
+            // ended up reading zero.
+            //
+            // The remainder stays where it is and the single one goes to a free
+            // slot. Once it has rounds in it, it can no longer merge with them.
+            int free = inv.firstEmpty();
+            if (free < 0) {
+                return null;
+            }
+            ItemStack single = mag.clone();
+            single.setAmount(1);
+            setMagazineContents(single, 0, null);
+
             ItemStack rest = mag.clone();
             rest.setAmount(mag.getAmount() - 1);
             setMagazineContents(rest, 0, null);
-            mag.setAmount(1);
-            setMagazineContents(mag, 0, null);
-            inv.setItem(bestSlot, mag);
-            giveOrDrop(player, rest);
-            return mag;
+
+            inv.setItem(bestSlot, rest);
+            inv.setItem(free, single);
+            return inv.getItem(free);
         }
         if (mag.getAmount() != 1) {
             return null;
