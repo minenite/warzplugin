@@ -555,9 +555,6 @@ public final class CorpseService implements Listener {
     // right-clicks, and whichever ran first decided whether the corpse opened.
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = false)
     public void onInteract(PlayerInteractEntityEvent event) {
-        plugin.getLogger().info("Corpse interact: " + event.getRightClicked().getType()
-                + " corpse=" + (corpseOf(event.getRightClicked()) != null)
-                + " cancelled=" + event.isCancelled());
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
