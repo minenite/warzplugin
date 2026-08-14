@@ -342,9 +342,6 @@ public final class CorpseService implements Listener {
             m.setDescription(null);
             try {
                 if (profile != null) {
-                    plugin.getLogger().info("Corpse skin: " + ownerName + " profile properties="
-                            + profile.getProperties().size() + " " + profile.getProperties().stream()
-                            .map(com.destroystokyo.paper.profile.ProfileProperty::getName).toList());
                     m.setProfile(ResolvableProfile.resolvableProfile(profile));
                 } else {
                     plugin.getLogger().warning("Corpse skin: no profile for " + ownerName);
@@ -551,14 +548,18 @@ public final class CorpseService implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEntityEvent event) {
-        plugin.getLogger().info("Corpse interact: " + event.getRightClicked().getType()
-                + " hand=" + event.getHand()
-                + " corpse=" + (corpseOf(event.getRightClicked()) != null));
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         Corpse corpse = corpseOf(event.getRightClicked());
         if (corpse == null) {
+            // A body part with no corpse behind it - left by an earlier session.
+            // These pile up at a death site and swallow the clicks meant for the
+            // real corpse, which is what "the corpse will not open" looked like.
+            // Clicking one clears it, so the site heals itself.
+            if (removeIfOrphan(event.getRightClicked())) {
+                event.setCancelled(true);
+            }
             return;
         }
         event.setCancelled(true);
@@ -567,8 +568,6 @@ public final class CorpseService implements Listener {
             player.sendMessage(Component.text("Too far to loot.", NamedTextColor.GRAY));
             return;
         }
-        plugin.getLogger().info("Corpse open: " + player.getName() + " -> " + corpse.ownerName
-                + " viewers=" + corpse.inventory.getViewers().size());
         player.openInventory(corpse.inventory);
         player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.7f, 1.0f);
     }
@@ -626,8 +625,6 @@ public final class CorpseService implements Listener {
         if (corpse == null) {
             return;
         }
-        plugin.getLogger().info("Corpse close: " + event.getPlayer().getName()
-                + " -> " + corpse.ownerName);
         syncBodyFromGui(corpse);
         if (event.getPlayer() instanceof Player player) {
             player.playSound(player.getLocation(), Sound.BLOCK_CHEST_CLOSE, 0.55f, 1.0f);
@@ -640,8 +637,17 @@ public final class CorpseService implements Listener {
         saveCorpses();
     }
 
+    private int sweepCounter;
+
     private void tick() {
         long now = System.currentTimeMillis();
+        if (++sweepCounter >= 30) {
+            sweepCounter = 0;
+            int removed = purgeOrphans();
+            if (removed > 0) {
+                plugin.getLogger().info("Cleared " + removed + " orphaned corpse part(s).");
+            }
+        }
         Iterator<Map.Entry<UUID, Corpse>> it = corpses.entrySet().iterator();
         while (it.hasNext()) {
             Corpse corpse = it.next().getValue();
@@ -806,6 +812,45 @@ public final class CorpseService implements Listener {
             }
         }
         corpse.inventory.clear();
+    }
+
+    /**
+     * Removes a corpse part whose corpse is no longer tracked.
+     *
+     * <p>The plugin cleans these on chunk load, but CardForge does not fire
+     * ChunkLoadEvent, so that never runs and they accumulate.
+     *
+     * @return true if the entity was an orphan and has been removed
+     */
+    private boolean removeIfOrphan(Entity entity) {
+        if (entity == null || !entity.getPersistentDataContainer().has(corpseIdKey, PersistentDataType.STRING)) {
+            return false;
+        }
+        entity.remove();
+        return true;
+    }
+
+    /** Sweeps corpse parts whose corpse is gone, for the same reason. */
+    private int purgeOrphans() {
+        int removed = 0;
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : List.copyOf(world.getEntities())) {
+                String id = entity.getPersistentDataContainer().get(corpseIdKey, PersistentDataType.STRING);
+                if (id == null) {
+                    continue;
+                }
+                try {
+                    if (corpses.containsKey(UUID.fromString(id))) {
+                        continue;
+                    }
+                } catch (IllegalArgumentException malformed) {
+                    // Not one of ours any more; treat as an orphan.
+                }
+                entity.remove();
+                removed++;
+            }
+        }
+        return removed;
     }
 
     private Corpse corpseOf(Entity entity) {
