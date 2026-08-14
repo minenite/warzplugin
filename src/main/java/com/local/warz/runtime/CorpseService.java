@@ -527,9 +527,13 @@ public final class CorpseService implements Listener {
         } else {
             look.normalize();
         }
-        // Head lies ~1.6 along this axis from feet; mid-chest ≈ 0.95
-        Vector alongBody = new Vector(look.getZ(), 0, -look.getX());
-        return base.add(alongBody.multiply(0.95));
+        // A sleeping body lies along the way it was facing, so the torso is that
+        // far along the look direction. This used to rotate the vector ninety
+        // degrees - (z, 0, -x) is perpendicular, not along - which put the name tag
+        // and, worse, the click box about a metre to the side of the body. Aiming
+        // at the corpse therefore missed the thing that opens it, and aiming at
+        // empty ground hit it, which is exactly how it behaved.
+        return base.add(look.multiply(0.95));
     }
 
     private boolean withinLootRange(Player player, Corpse corpse) {
@@ -551,6 +555,9 @@ public final class CorpseService implements Listener {
     // right-clicks, and whichever ran first decided whether the corpse opened.
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = false)
     public void onInteract(PlayerInteractEntityEvent event) {
+        plugin.getLogger().info("Corpse interact: " + event.getRightClicked().getType()
+                + " corpse=" + (corpseOf(event.getRightClicked()) != null)
+                + " cancelled=" + event.isCancelled());
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
