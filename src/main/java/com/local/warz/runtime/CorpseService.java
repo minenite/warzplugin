@@ -342,15 +342,25 @@ public final class CorpseService implements Listener {
             m.setDescription(null);
             try {
                 if (profile != null) {
+                    plugin.getLogger().info("Corpse skin: " + ownerName + " profile properties="
+                            + profile.getProperties().size() + " " + profile.getProperties().stream()
+                            .map(com.destroystokyo.paper.profile.ProfileProperty::getName).toList());
                     m.setProfile(ResolvableProfile.resolvableProfile(profile));
+                } else {
+                    plugin.getLogger().warning("Corpse skin: no profile for " + ownerName);
                 }
-            } catch (Throwable ignored) {
+            } catch (Throwable failed) {
+                // Was swallowed silently, which is why a skinless corpse looked
+                // like nothing had gone wrong.
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Corpse skin failed for " + ownerName, failed);
             }
             try {
                 if (skinParts != null) {
                     m.setSkinParts(skinParts);
                 }
-            } catch (Throwable ignored) {
+            } catch (Throwable failed) {
+                plugin.getLogger().warning("Corpse skin parts failed for " + ownerName + ": " + failed);
             }
             // Equipment only — never call set*DropChance (Mannequin is not a Mob; that crashed us)
             if (plugin.getConfig().getBoolean("corpses.render-armor", true)) {
@@ -418,6 +428,18 @@ public final class CorpseService implements Listener {
             chestInv.setItem(slot++, stack);
         }
 
+        String skinValue = null;
+        String skinSignature = null;
+        if (profile != null) {
+            for (com.destroystokyo.paper.profile.ProfileProperty property : profile.getProperties()) {
+                if ("textures".equals(property.getName())) {
+                    skinValue = property.getValue();
+                    skinSignature = property.getSignature();
+                    break;
+                }
+            }
+        }
+
         corpses.put(corpseId, new Corpse(
                 corpseId,
                 ownerId,
@@ -428,7 +450,9 @@ public final class CorpseService implements Listener {
                 chestInv,
                 despawnAtMs,
                 pose,
-                bodyYaw
+                bodyYaw,
+                skinValue,
+                skinSignature
         ));
 
         plugin.getLogger().info("Corpse spawned for " + ownerName
@@ -527,6 +551,9 @@ public final class CorpseService implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEntityEvent event) {
+        plugin.getLogger().info("Corpse interact: " + event.getRightClicked().getType()
+                + " hand=" + event.getHand()
+                + " corpse=" + (corpseOf(event.getRightClicked()) != null));
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
@@ -540,6 +567,8 @@ public final class CorpseService implements Listener {
             player.sendMessage(Component.text("Too far to loot.", NamedTextColor.GRAY));
             return;
         }
+        plugin.getLogger().info("Corpse open: " + player.getName() + " -> " + corpse.ownerName
+                + " viewers=" + corpse.inventory.getViewers().size());
         player.openInventory(corpse.inventory);
         player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.7f, 1.0f);
     }
@@ -597,6 +626,8 @@ public final class CorpseService implements Listener {
         if (corpse == null) {
             return;
         }
+        plugin.getLogger().info("Corpse close: " + event.getPlayer().getName()
+                + " -> " + corpse.ownerName);
         syncBodyFromGui(corpse);
         if (event.getPlayer() instanceof Player player) {
             player.playSound(player.getLocation(), Sound.BLOCK_CHEST_CLOSE, 0.55f, 1.0f);
@@ -840,6 +871,13 @@ public final class CorpseService implements Listener {
             yaml.set(path + ".z", at.getZ());
             yaml.set(path + ".yaw", corpse.bodyYaw);
             yaml.set(path + ".despawn-at", corpse.despawnAtMs);
+            // The skin travels with the body. Rebuilding a profile from name and
+            // UUID alone gives a default-skinned corpse, because this server is
+            // offline-mode behind the proxy and has nothing to resolve against.
+            if (corpse.skinValue != null) {
+                yaml.set(path + ".skin-value", corpse.skinValue);
+                yaml.set(path + ".skin-signature", corpse.skinSignature);
+            }
             // Whole chest, so the equipment row keeps its slots.
             yaml.set(path + ".contents", java.util.Arrays.asList(corpse.inventory.getContents()));
         }
@@ -926,6 +964,11 @@ public final class CorpseService implements Listener {
             com.destroystokyo.paper.profile.PlayerProfile profile = null;
             try {
                 profile = Bukkit.createProfile(ownerId, ownerName);
+                String skinValue = sec.getString("skin-value");
+                if (profile != null && skinValue != null) {
+                    profile.setProperty(new com.destroystokyo.paper.profile.ProfileProperty(
+                            "textures", skinValue, sec.getString("skin-signature")));
+                }
             } catch (Throwable ignored) {
             }
             try {
@@ -962,12 +1005,18 @@ public final class CorpseService implements Listener {
         final UUID labelEntityId;
         final Inventory inventory;
         final long despawnAtMs;
+        /** The owner's texture property, kept so a restored body still wears their skin. */
+        final String skinValue;
+        final String skinSignature;
         final Pose pose;
         /** Death yaw — sleeping body stretches this way from the feet origin. */
         final float bodyYaw;
 
         Corpse(UUID id, UUID ownerId, String ownerName, UUID bodyEntityId, UUID clickEntityId,
-               UUID labelEntityId, Inventory inventory, long despawnAtMs, Pose pose, float bodyYaw) {
+               UUID labelEntityId, Inventory inventory, long despawnAtMs, Pose pose, float bodyYaw,
+               String skinValue, String skinSignature) {
+            this.skinValue = skinValue;
+            this.skinSignature = skinSignature;
             this.id = id;
             this.ownerId = ownerId;
             this.ownerName = ownerName;
