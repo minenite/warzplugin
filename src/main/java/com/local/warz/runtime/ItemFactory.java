@@ -3943,8 +3943,12 @@ public final class ItemFactory {
         }
         List<String> load = magazineLoadList(stack);
         int count = load.size();
-        int n = Math.max(1, stack.getAmount());
-        int cap = count > 0 ? type.capacity() : type.capacity() * n;
+        // Deliberately not the stack amount. The name and lore used to include it -
+        // "x2 (empty)" against "[0/30]" - which made a single empty magazine a
+        // different item from a stack of them, so they refused to merge, a stack
+        // showed the wrong thing until the window was touched, and a magazine
+        // taken out of a corpse came back unable to stack with the ones already
+        // held. The client already draws the number in the corner.
         ItemMeta meta = stack.getItemMeta();
         Map<String, Integer> counts = magazineLoadCounts(stack);
         String nextId = count > 0 ? load.get(load.size() - 1) : null;
@@ -3957,14 +3961,8 @@ public final class ItemFactory {
         } else {
             loadedLine = "&7Loaded: &fMixed &8· next &f" + nextLabel;
         }
-        Component name;
-        if (count > 0) {
-            name = colorize(type.displayName() + " &7[" + count + "/" + type.capacity() + "]");
-        } else if (n > 1) {
-            name = colorize(type.displayName() + " &7×" + n + " &8(empty)");
-        } else {
-            name = colorize(type.displayName() + " &7[0/" + type.capacity() + "]");
-        }
+        Component name = colorize(type.displayName()
+                + " &7[" + count + "/" + type.capacity() + "]");
         meta.displayName(name.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         try {
             meta.itemName(name.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
@@ -3983,9 +3981,6 @@ public final class ItemFactory {
             }
             detail.add(colorize("&7Capacity: &f" + type.capacity() + " &7· open &f" + (type.capacity() - count)));
             detail.add(colorize("&cDoes not stack while loaded"));
-        } else if (n > 1) {
-            detail.add(colorize("&7Empty stack · &f" + n + " &7× &f" + type.capacity()
-                    + " &7cap each (&f" + cap + " &7total)"));
         } else {
             detail.add(colorize("&7Capacity: &f" + type.capacity()));
         }

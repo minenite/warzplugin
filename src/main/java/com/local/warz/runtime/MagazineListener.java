@@ -60,45 +60,27 @@ public final class MagazineListener implements Listener {
                     event.setCurrentItem(null);
                 }
                 player.sendActionBar(ItemFactory.colorize("&aLoaded &f" + loaded + " &7into mag"));
+                player.updateInventory();
                 return;
             }
         }
 
-        // Empty mag + empty mag merge
+        // Loaded magazines must never merge - each holds its own rounds, and letting
+        // them stack would fold one lot into the other.
         if (plugin.items().isMagazine(cursor) && plugin.items().isMagazine(current)
-                && cursor.getAmount() > 0 && current.getAmount() > 0) {
-            if (plugin.items().magazineCount(cursor) > 0 || plugin.items().magazineCount(current) > 0) {
-                // Never let vanilla merge/clone loaded mag NBT
-                if (plugin.items().magazineType(cursor) == plugin.items().magazineType(current)) {
-                    event.setCancelled(true);
-                    player.sendActionBar(ItemFactory.colorize("&cLoaded mags can't stack"));
-                    return;
-                }
-            } else if (plugin.items().magazinesCanMerge(current, cursor)) {
-                event.setCancelled(true);
-                plugin.items().mergeMagazines(current, cursor);
-                event.setCurrentItem(current);
-                event.setCursor(cursor.getAmount() <= 0 ? null : cursor);
-                return;
-            }
-        }
-
-        // Right-click split empty stacks only
-        if (event.getClick() == ClickType.RIGHT
-                && (cursor == null || cursor.getType().isAir())
-                && plugin.items().isMagazine(current)
-                && plugin.items().magazineCount(current) <= 0
-                && current.getAmount() > 1
-                && event.getAction() == InventoryAction.PICKUP_HALF) {
+                && cursor.getAmount() > 0 && current.getAmount() > 0
+                && (plugin.items().magazineCount(cursor) > 0 || plugin.items().magazineCount(current) > 0)
+                && plugin.items().magazineType(cursor) == plugin.items().magazineType(current)) {
             event.setCancelled(true);
-            int take = (current.getAmount() + 1) / 2;
-            ItemStack half = plugin.items().splitMagazineStack(current, take);
-            if (half != null) {
-                event.setCurrentItem(current);
-                event.setCursor(half);
-            }
+            player.sendActionBar(ItemFactory.colorize("&cLoaded mags can't stack"));
+            player.updateInventory();
             return;
         }
+
+        // Empty magazines are left to the server itself. They are ordinary
+        // identical items now, so stacking, splitting and shift-clicking all work
+        // on their own - and doing it by hand here is what left a stack drawn
+        // wrongly until the window was touched, and what broke on a right-click.
 
         // Cursor ammo → slot mag (same material OK — .50 clay mag + clay rounds)
         if (plugin.items().roundOf(cursor).isPresent() && plugin.items().isMagazine(current)) {
@@ -124,6 +106,7 @@ public final class MagazineListener implements Listener {
                 player.sendActionBar(ItemFactory.colorize("&aLoaded &f" + took
                         + " &7→ [" + plugin.items().magazineCount(mag)
                         + "/" + plugin.items().magazineType(mag).capacity() + "]"));
+                player.updateInventory();
             } else {
                 if (restEmpties != null) {
                     event.setCurrentItem(current);
@@ -164,6 +147,7 @@ public final class MagazineListener implements Listener {
                 player.sendActionBar(ItemFactory.colorize("&aLoaded &f" + took
                         + " &7→ [" + plugin.items().magazineCount(mag)
                         + "/" + plugin.items().magazineType(mag).capacity() + "]"));
+                player.updateInventory();
             } else {
                 MagazineType mt = plugin.items().magazineType(mag);
                 Optional<RoundDefinition> r = plugin.items().roundOf(current);
