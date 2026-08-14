@@ -297,7 +297,15 @@ public final class BlastShockService implements Listener {
         if (player == null || type == null || ticks <= 0) {
             return;
         }
-        player.addPotionEffect(new PotionEffect(type, ticks, Math.max(0, amplifier), false, true, true), true);
+        try {
+            player.addPotionEffect(new PotionEffect(type, ticks, Math.max(0, amplifier), false, true, true), true);
+        } catch (Throwable refused) {
+            // A missing effect must not cost the rest of the blast. This threw on a
+            // potion type the server could not resolve, and took the explosion with
+            // it - no shockwave, no crater, and nothing for regen to put back.
+            // Losing one debuff is a far smaller thing.
+            Bukkit.getLogger().warning("[Warz] Could not apply " + type.getKey() + ": " + refused);
+        }
     }
 
     private static int ticksForRecovery(float amount, int min, int max) {
