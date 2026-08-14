@@ -120,12 +120,34 @@ public final class CorpseService implements Listener {
         return purgeMarkedEntities();
     }
 
-    /** Sweep loaded worlds for orphan Mannequin / Interaction / TextDisplay corpse parts. */
+    /**
+     * Sweep loaded worlds for orphan Mannequin / Interaction / TextDisplay corpse parts.
+     *
+     * <p>Two ways of recognising one. The tag is the reliable way, but CardForge
+     * did not persist entity data containers, so bodies from before that was fixed
+     * come back untagged - unrecognisable to the very cleanup meant to remove
+     * them, which is why they sat there through every clear.
+     *
+     * <p>So a body is also recognised by what it is made of: a mannequin, or the
+     * name plate above it, or the click box beside them. Only entities of exactly
+     * the kinds a corpse uses are considered, and only when a tagged part or a
+     * corpse name plate is nearby, so nothing else built from display entities is
+     * caught by it.
+     */
     public int purgeMarkedEntities() {
         int removed = 0;
         for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : List.copyOf(world.getEntities())) {
-                if (!entity.getPersistentDataContainer().has(corpseIdKey, PersistentDataType.STRING)) {
+            List<Entity> entities = List.copyOf(world.getEntities());
+            List<Location> corpseSites = new ArrayList<>();
+            for (Entity entity : entities) {
+                if (entity.getPersistentDataContainer().has(corpseIdKey, PersistentDataType.STRING)
+                        || isCorpseNamePlate(entity)) {
+                    corpseSites.add(entity.getLocation());
+                }
+            }
+            for (Entity entity : entities) {
+                boolean tagged = entity.getPersistentDataContainer().has(corpseIdKey, PersistentDataType.STRING);
+                if (!tagged && !(isCorpseNamePlate(entity) || isUntaggedCorpsePart(entity, corpseSites))) {
                     continue;
                 }
                 entity.remove();
@@ -884,6 +906,38 @@ public final class CorpseService implements Listener {
             }
         }
         return removed;
+    }
+
+    /** A corpse's name plate, recognisable by the text the plugin writes on it. */
+    private static boolean isCorpseNamePlate(Entity entity) {
+        if (!(entity instanceof TextDisplay display)) {
+            return false;
+        }
+        Component text = display.text();
+        if (text == null) {
+            return false;
+        }
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(text).endsWith("'s Corpse");
+    }
+
+    /**
+     * A mannequin or click box sitting where a corpse was, with its tag lost.
+     *
+     * <p>Deliberately narrow: only these two kinds, and only within two blocks of
+     * something already known to be part of a corpse.
+     */
+    private static boolean isUntaggedCorpsePart(Entity entity, List<Location> corpseSites) {
+        if (!(entity instanceof Mannequin) && !(entity instanceof Interaction)) {
+            return false;
+        }
+        for (Location site : corpseSites) {
+            if (site.getWorld() != null && site.getWorld().equals(entity.getWorld())
+                    && site.distanceSquared(entity.getLocation()) <= 4.0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Corpse corpseOf(Entity entity) {
