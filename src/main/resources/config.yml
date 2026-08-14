@@ -121,3 +121,18 @@ explosion-regen:
   # wait behind it.
   drain-seconds: 20
   max-blocks-per-tick: 32
+
+# Death corpses - a player-skinned body you can loot, instead of items on the
+# ground. Pose matches unldenis/Corpse: SLEEPING or SWIMMING.
+corpses:
+  enabled: true
+  lifetime-seconds: 180
+  instant-respawn: true
+  pose: SLEEPING
+  render-armor: true
+  # Max distance from corpse torso to open its loot.
+  loot-range: 3
+  # When lifetime expires, spawn a zombie digging up from the corpse.
+  despawn-zombie: true
+  # Drop whatever is still inside when the body expires, rather than deleting it.
+  drop-on-expire: true

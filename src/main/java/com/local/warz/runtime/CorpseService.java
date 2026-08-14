@@ -85,9 +85,14 @@ public final class CorpseService implements Listener {
         if (tickTask != null) {
             tickTask.cancel();
         }
-        // Drop any leftover corpse entities from a previous session (were setPersistent).
+        // The bodies left in the world are stale - their inventories died with the
+        // last session - so they are swept and rebuilt from disk instead, which is
+        // what keeps the loot inside them.
         clearAll();
-        Bukkit.getScheduler().runTaskLater(plugin, this::purgeMarkedEntities, 40L);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            purgeMarkedEntities();
+            loadCorpses();
+        }, 40L);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
     }
 
@@ -96,6 +101,8 @@ public final class CorpseService implements Listener {
             tickTask.cancel();
             tickTask = null;
         }
+        // Written before the bodies go, so a restart gives them back.
+        saveCorpses();
         clearAll();
     }
 
@@ -274,9 +281,38 @@ public final class CorpseService implements Listener {
     private void spawnCorpse(Player victim, Location at, List<ItemStack> loot,
                              ItemStack helmet, ItemStack chest, ItemStack legs, ItemStack boots,
                              ItemStack main, ItemStack off) {
+        SkinParts parts = null;
+        try {
+            parts = victim.getClientOption(ClientOption.SKIN_PARTS);
+        } catch (Throwable ignored) {
+        }
+        UUID id = spawnCorpse(victim.getUniqueId(), victim.getName(), victim.getPlayerProfile(), parts,
+                at, loot, helmet, chest, legs, boots, main, off,
+                System.currentTimeMillis() + lifetimeTicks() * 50L);
+        if (id == null) {
+            return;
+        }
+        // Somewhere to come back to. Dying and having no idea where the body fell
+        // is the difference between a setback and losing everything.
+        victim.sendMessage(Component.text("Corpse left behind at "
+                + at.getBlockX() + ", " + at.getBlockY() + ", " + at.getBlockZ()
+                + " (" + (lifetimeTicks() / 20) + "s).", NamedTextColor.GRAY));
+        saveCorpses();
+    }
+
+    /**
+     * Builds a corpse from stored identity rather than a live player.
+     *
+     * <p>Split out so a corpse can be rebuilt after a restart, when the only thing
+     * left of its owner is a name and a UUID.
+     */
+    private UUID spawnCorpse(UUID ownerId, String ownerName, com.destroystokyo.paper.profile.PlayerProfile profile,
+                             SkinParts skinParts, Location at, List<ItemStack> loot,
+                             ItemStack helmet, ItemStack chest, ItemStack legs, ItemStack boots,
+                             ItemStack main, ItemStack off, long despawnAtMs) {
         World world = at.getWorld();
         if (world == null) {
-            return;
+            return null;
         }
 
         Location spawnAt = at.clone();
@@ -285,7 +321,7 @@ public final class CorpseService implements Listener {
         spawnAt.setPitch(0f);
 
         UUID corpseId = UUID.randomUUID();
-        Component title = Component.text(victim.getName() + "'s Corpse", NamedTextColor.DARK_RED)
+        Component title = Component.text(ownerName + "'s Corpse", NamedTextColor.DARK_RED)
                 .decoration(TextDecoration.ITALIC, false);
 
         Pose pose = resolvePose();
@@ -305,13 +341,14 @@ public final class CorpseService implements Listener {
             m.setCustomNameVisible(false);
             m.setDescription(null);
             try {
-                m.setProfile(ResolvableProfile.resolvableProfile(victim.getPlayerProfile()));
+                if (profile != null) {
+                    m.setProfile(ResolvableProfile.resolvableProfile(profile));
+                }
             } catch (Throwable ignored) {
             }
             try {
-                SkinParts skin = victim.getClientOption(ClientOption.SKIN_PARTS);
-                if (skin != null) {
-                    m.setSkinParts(skin);
+                if (skinParts != null) {
+                    m.setSkinParts(skinParts);
                 }
             } catch (Throwable ignored) {
             }
@@ -383,22 +420,21 @@ public final class CorpseService implements Listener {
 
         corpses.put(corpseId, new Corpse(
                 corpseId,
-                victim.getUniqueId(),
-                victim.getName(),
+                ownerId,
+                ownerName,
                 body.getUniqueId(),
                 click.getUniqueId(),
                 label.getUniqueId(),
                 chestInv,
-                System.currentTimeMillis() + lifetimeTicks() * 50L,
+                despawnAtMs,
                 pose,
                 bodyYaw
         ));
 
-        victim.sendMessage(Component.text("Corpse left behind (" + (lifetimeTicks() / 20) + "s).",
-                NamedTextColor.GRAY));
-        plugin.getLogger().info("Corpse spawned for " + victim.getName()
+        plugin.getLogger().info("Corpse spawned for " + ownerName
                 + " at " + spawnAt.getBlockX() + "," + spawnAt.getBlockY() + "," + spawnAt.getBlockZ()
                 + " (" + loot.size() + " bag + worn gear)");
+        return corpseId;
     }
 
     private static void applyBodyEquipment(Mannequin body,
@@ -568,6 +604,9 @@ public final class CorpseService implements Listener {
         if (isEmpty(corpse.inventory)) {
             removeCorpse(corpse, false);
         }
+        // What is left in the body is what a restart should give back, so the
+        // saved copy is refreshed whenever somebody stops taking things out of it.
+        saveCorpses();
     }
 
     private void tick() {
@@ -591,6 +630,17 @@ public final class CorpseService implements Listener {
             }
             if (now >= corpse.despawnAtMs) {
                 Location at = body.getLocation().clone();
+                if (hasViewers(corpse)) {
+                    // Somebody has it open. Taking it out from under them would be
+                    // both confusing and a way to lose whatever they were mid-way
+                    // through moving.
+                    continue;
+                }
+                if (plugin.getConfig().getBoolean("corpses.drop-on-expire", true)) {
+                    // Unlooted gear falls where the body was. It used to be deleted
+                    // outright, which quietly destroyed anything nobody reached.
+                    dropRemaining(corpse, at);
+                }
                 clearLoot(corpse);
                 closeViewers(corpse);
                 body.remove();
@@ -660,6 +710,17 @@ public final class CorpseService implements Listener {
             label.remove();
         }
         closeViewers(corpse);
+    }
+
+    /** True while any player has this corpse's chest open. */
+    private boolean hasViewers(Corpse corpse) {
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.getOpenInventory().getTopInventory().getHolder() instanceof Holder h
+                    && corpse.id.equals(h.corpseId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void closeViewers(Corpse corpse) {
@@ -745,6 +806,151 @@ public final class CorpseService implements Listener {
             return null;
         }
         return stack.clone();
+    }
+
+    // ------------------------------------------------------------ persistence
+
+    private java.io.File corpsesFile() {
+        return new java.io.File(plugin.getDataFolder(), "corpses.yml");
+    }
+
+    /**
+     * Writes every corpse and its contents to disk.
+     *
+     * <p>Restarts used to take the gear with them: start() cleared the leftover
+     * bodies and discarded what was inside, so anyone who died shortly before a
+     * restart lost the lot. Saving is cheap - this happens on death, on looting
+     * and on shutdown, not on a timer.
+     */
+    public void saveCorpses() {
+        org.bukkit.configuration.file.YamlConfiguration yaml =
+                new org.bukkit.configuration.file.YamlConfiguration();
+        for (Corpse corpse : corpses.values()) {
+            Entity body = Bukkit.getEntity(corpse.bodyEntityId);
+            if (body == null || !body.isValid()) {
+                continue;
+            }
+            Location at = body.getLocation();
+            String path = "corpses." + corpse.id;
+            yaml.set(path + ".owner", corpse.ownerId.toString());
+            yaml.set(path + ".name", corpse.ownerName);
+            yaml.set(path + ".world", at.getWorld().getName());
+            yaml.set(path + ".x", at.getX());
+            yaml.set(path + ".y", at.getY());
+            yaml.set(path + ".z", at.getZ());
+            yaml.set(path + ".yaw", corpse.bodyYaw);
+            yaml.set(path + ".despawn-at", corpse.despawnAtMs);
+            // Whole chest, so the equipment row keeps its slots.
+            yaml.set(path + ".contents", java.util.Arrays.asList(corpse.inventory.getContents()));
+        }
+        try {
+            plugin.getDataFolder().mkdirs();
+            yaml.save(corpsesFile());
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Could not save corpses.yml: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Rebuilds saved corpses, dropping the loot of any that cannot be placed.
+     *
+     * <p>An expired corpse is not rebuilt - its loot is dropped where it fell, so
+     * a long restart does not quietly delete somebody's gear.
+     */
+    public void loadCorpses() {
+        java.io.File file = corpsesFile();
+        if (!file.exists()) {
+            return;
+        }
+        org.bukkit.configuration.file.YamlConfiguration yaml =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        org.bukkit.configuration.ConfigurationSection root = yaml.getConfigurationSection("corpses");
+        if (root == null) {
+            return;
+        }
+        int restored = 0;
+        int dropped = 0;
+        long now = System.currentTimeMillis();
+        for (String key : root.getKeys(false)) {
+            org.bukkit.configuration.ConfigurationSection sec = root.getConfigurationSection(key);
+            if (sec == null) {
+                continue;
+            }
+            World world = Bukkit.getWorld(String.valueOf(sec.getString("world")));
+            if (world == null) {
+                continue;
+            }
+            Location at = new Location(world, sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z"));
+            at.setYaw((float) sec.getDouble("yaw"));
+
+            List<ItemStack> contents = new ArrayList<>();
+            for (Object raw : sec.getList("contents", java.util.List.of())) {
+                contents.add(raw instanceof ItemStack stack ? stack : null);
+            }
+
+            long despawnAt = sec.getLong("despawn-at", now);
+            if (despawnAt <= now) {
+                // Already expired while the server was down. Give it back rather
+                // than delete it: the owner never had the chance to reach it.
+                for (ItemStack stack : contents) {
+                    if (stack != null && !stack.getType().isAir()) {
+                        world.dropItemNaturally(at, stack);
+                        dropped++;
+                    }
+                }
+                continue;
+            }
+
+            UUID ownerId;
+            try {
+                ownerId = UUID.fromString(String.valueOf(sec.getString("owner")));
+            } catch (IllegalArgumentException malformed) {
+                continue;
+            }
+            String ownerName = sec.getString("name", "Unknown");
+
+            ItemStack helmet = slotOf(contents, SLOT_HELMET);
+            ItemStack chestPiece = slotOf(contents, SLOT_CHEST);
+            ItemStack legs = slotOf(contents, SLOT_LEGS);
+            ItemStack boots = slotOf(contents, SLOT_BOOTS);
+            ItemStack off = slotOf(contents, SLOT_OFF);
+            ItemStack main = slotOf(contents, SLOT_MAIN);
+            List<ItemStack> loot = new ArrayList<>();
+            for (int i = 0; i < Math.min(LOOT_END, contents.size()); i++) {
+                ItemStack stack = contents.get(i);
+                if (stack != null && !stack.getType().isAir()) {
+                    loot.add(stack);
+                }
+            }
+
+            com.destroystokyo.paper.profile.PlayerProfile profile = null;
+            try {
+                profile = Bukkit.createProfile(ownerId, ownerName);
+            } catch (Throwable ignored) {
+            }
+            try {
+                if (spawnCorpse(ownerId, ownerName, profile, null, at, loot,
+                        helmet, chestPiece, legs, boots, main, off, despawnAt) != null) {
+                    restored++;
+                }
+            } catch (Throwable failed) {
+                plugin.getLogger().warning("Could not restore " + ownerName + "'s corpse: " + failed.getMessage());
+                for (ItemStack stack : contents) {
+                    if (stack != null && !stack.getType().isAir()) {
+                        world.dropItemNaturally(at, stack);
+                        dropped++;
+                    }
+                }
+            }
+        }
+        if (restored > 0 || dropped > 0) {
+            plugin.getLogger().info("Corpses: restored " + restored + ", dropped " + dropped + " item(s).");
+        }
+        saveCorpses();
+    }
+
+    private static ItemStack slotOf(List<ItemStack> contents, int slot) {
+        return slot < contents.size() ? contents.get(slot) : null;
     }
 
     private static final class Corpse {
