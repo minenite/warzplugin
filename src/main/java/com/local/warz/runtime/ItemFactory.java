@@ -349,6 +349,10 @@ public final class ItemFactory {
         meta.displayName(colorize(def.displayName()));
         stack.setItemMeta(meta);
         applyGunInventoryLore(stack, false);
+        // A gun carries its own state - fitted attachments, what is chambered, its
+        // wear - so two of them are never the same item. Stacking would merge
+        // those into one.
+        applyMaxStack(stack, 1);
         return stack;
     }
 
@@ -1822,13 +1826,10 @@ public final class ItemFactory {
         lore.add(colorize("&8Hold &eShift")
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         meta.lore(lore);
-        if (def.explodeRadiusAdd() > 0) {
-            try {
-                meta.setMaxStackSize(HE_LOOSE_STACK_MAX);
-            } catch (Throwable ignored) {
-            }
-        }
         stack.setItemMeta(meta);
+        // Rounds of the same kind are interchangeable, so they stack. Explosive
+        // ones stay in small piles - the same reason they always did.
+        applyMaxStack(stack, def.explodeRadiusAdd() > 0 ? HE_LOOSE_STACK_MAX : 64);
         return stack;
     }
 
@@ -1936,6 +1937,27 @@ public final class ItemFactory {
         } catch (Throwable t) {
             Bukkit.getLogger().warning("[WarzPlugin] markMedicalUsable failed for "
                     + stack.getType() + ": " + t);
+        }
+    }
+
+    /**
+     * Sets how high an item stacks.
+     *
+     * <p>Must be called after the meta is written: setItemMeta replaces the item's
+     * components, so a stack size set before it is thrown away. That is why the
+     * medical items set it twice and the magazines - which only ever set it
+     * through the meta - never actually stacked.
+     *
+     * @param max 1 to 99, the range the component allows
+     */
+    public static void applyMaxStack(ItemStack stack, int max) {
+        if (stack == null || stack.getType().isAir()) {
+            return;
+        }
+        try {
+            stack.setData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE,
+                    Math.max(1, Math.min(99, max)));
+        } catch (Throwable ignored) {
         }
     }
 
@@ -3623,6 +3645,10 @@ public final class ItemFactory {
         } else {
             writeMagazineLoad(stack, List.of());
         }
+        // Last, because writing the load rewrites the meta and takes the component
+        // with it. An empty magazine is interchangeable with any other, so they
+        // stack; a loaded one holds its own rounds and cannot.
+        applyMaxStack(stack, rounds > 0 ? 1 : 64);
         return stack;
     }
 
@@ -3873,6 +3899,12 @@ public final class ItemFactory {
         }
         stack.setItemMeta(meta);
         refreshMagazineLore(stack);
+        // Every path that loads or empties a magazine ends here, so the stack size
+        // is settled here too. Anywhere else and a magazine that had just been
+        // emptied would keep the loaded rule and refuse to stack, and - worse - a
+        // magazine that had just been filled could still stack with an empty one
+        // and take its rounds along.
+        applyMaxStack(stack, magazineLoadList(stack).isEmpty() ? 64 : 1);
     }
 
     /** Uniform fill/clear helper (legacy API). */
@@ -3974,6 +4006,9 @@ public final class ItemFactory {
         } catch (Throwable ignored) {
         }
         stack.setItemMeta(meta);
+        // This is called on its own from several places, and setting the meta
+        // above drops the component, so the rule is restated here as well.
+        applyMaxStack(stack, count > 0 ? 1 : 64);
     }
 
     private String roundPlainName(String roundId) {

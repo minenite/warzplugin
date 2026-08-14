@@ -162,6 +162,17 @@ public final class WorldMapService implements Listener {
     }
 
     /** Builds a Warz overview map item, or {@code null} on failure. */
+    /** The single map view every Warz map shares, made once per world. */
+    private final java.util.Map<java.util.UUID, MapView> sharedViews = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private MapView sharedView(World world) {
+        return sharedViews.computeIfAbsent(world.getUID(), id -> {
+            MapView view = Bukkit.createMap(world);
+            attach(view);
+            return view;
+        });
+    }
+
     public ItemStack createMapItem(Player player) {
         if (!loaded || player == null) {
             return null;
@@ -171,8 +182,16 @@ public final class WorldMapService implements Listener {
             return null;
         }
         try {
-            MapView view = Bukkit.createMap(world);
-            attach(view);
+            // One view for the whole server, not one per map handed out. The
+            // renderer is given the player it is drawing for, so a shared view
+            // still shows each person their own position - and it means every map
+            // is the same item, which is what lets them stack at all. A fresh view
+            // per map made each one unique, so two would never merge however high
+            // the stack limit was set.
+            MapView view = sharedView(world);
+            if (view == null) {
+                return null;
+            }
 
             ItemStack stack = new ItemStack(Material.FILLED_MAP);
             MapMeta meta = (MapMeta) stack.getItemMeta();
@@ -186,6 +205,9 @@ public final class WorldMapService implements Listener {
                     ChatColor.RED + "●" + ChatColor.GRAY + " you  "
                             + ChatColor.GREEN + "●" + ChatColor.GRAY + " friends"));
             stack.setItemMeta(meta);
+            // A filled map is one per slot in vanilla; these are all the same map,
+            // so there is no reason to carry them one at a time.
+            com.local.warz.runtime.ItemFactory.applyMaxStack(stack, 64);
             return stack;
         } catch (Throwable t) {
             plugin.getLogger().severe("Failed to create world map: " + t.getMessage());
