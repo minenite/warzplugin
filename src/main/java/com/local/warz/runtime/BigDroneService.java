@@ -1233,7 +1233,7 @@ public final class BigDroneService {
             World world = boom.getWorld();
             registerCrashKillZone(boom, ownerName, air);
             String holdId = beginCrashCraterHold(boom);
-            world.createExplosion(boom, CRASH_BLAST_POWER, false, true, null);
+            world.createExplosion(boom, CRASH_BLAST_POWER, false, false, null);
             if (plugin.explosionRegen() != null) {
                 plugin.explosionRegen().carveCrater(boom, CRASH_BLAST_POWER);
             }
@@ -1523,7 +1523,7 @@ public final class BigDroneService {
         }
         // Larger crater — regen held until the wreckage barrel is fully looted.
         String holdId = beginCrashCraterHold(boom);
-        world.createExplosion(boom, CRASH_BLAST_POWER, false, true, null);
+        world.createExplosion(boom, CRASH_BLAST_POWER, false, false, null);
         if (plugin.explosionRegen() != null) {
             plugin.explosionRegen().carveCrater(boom, CRASH_BLAST_POWER);
         }

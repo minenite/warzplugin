@@ -1613,7 +1613,7 @@ public final class GunPlayerSession {
         if (plugin.explosionRegen() != null) {
             plugin.explosionRegen().blastTerrain(at, cookPower);
         }
-        at.getWorld().createExplosion(at, cookPower, false, true, null);
+        at.getWorld().createExplosion(at, cookPower, false, false, null);
         player.setFireTicks(Math.max(player.getFireTicks(), 60));
     }
 

@@ -115,6 +115,8 @@ public final class ImpactEffects {
         // Allow larger visual blasts for big-radius guns (e.g. drone LAW).
         float power = (float) Math.min(7.0, Math.max(1.0, radius));
         boolean breakBlocks = gun.isLaser() || radius >= 2.0;
+        // Set once the plugin's own carve has taken the terrain.
+        boolean carvedTerrain = false;
         // Shock envelope is independent of crater size (blastShockRadius / Strength on the gun).
         double shockRadius = gun.blastShockRadius() > 0 ? gun.blastShockRadius()
                 : (radius >= 6.0 ? 24.0 : 20.0);
@@ -140,9 +142,14 @@ public final class ImpactEffects {
             }
             if (warzRegen != null && warzRegen.explosionRegen() != null) {
                 warzRegen.explosionRegen().blastTerrain(impact, Math.max(power, radius));
+                carvedTerrain = true;
             }
         }
-        impact.getWorld().createExplosion(impact, power, false, breakBlocks, null);
+        // The vanilla explosion is here for its damage, knockback and particles.
+        // It must not break blocks as well: the carve above has already taken the
+        // terrain, dropless, and letting vanilla break it a second time is what
+        // scattered the crater across the ground as items.
+        impact.getWorld().createExplosion(impact, power, false, breakBlocks && !carvedTerrain, null);
         // Companion FLIR / drone white-hot & black-hot — vanilla explode packets don't reach altitude.
         if (plugin instanceof WarzPlugin warzHeat && warzHeat.laserBridge() != null) {
             warzHeat.laserBridge().broadcastThermalBlast(impact.clone().add(0, 0.35, 0), (float) radius);

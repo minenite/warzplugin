@@ -162,7 +162,7 @@ public final class DroneStrikeEffects {
         if (plugin.explosionRegen() != null) {
             plugin.explosionRegen().blastTerrain(at, 3.5);
         }
-        w.createExplosion(at, 2.2f, false, true, null);
+        w.createExplosion(at, 2.2f, false, false, null);
         if (plugin.blastShock() != null) {
             plugin.blastShock().apply(at.clone(), 28.0, profile.shockStrength());
         }
@@ -204,7 +204,7 @@ public final class DroneStrikeEffects {
             if (plugin.explosionRegen() != null) {
                 plugin.explosionRegen().blastTerrain(at, 6.0);
             }
-            w.createExplosion(at, 4.5f, false, true, null);
+            w.createExplosion(at, 4.5f, false, false, null);
             if (plugin.blastShock() != null) {
                 plugin.blastShock().apply(at.clone(), 32.0, profile.shockStrength());
             }
@@ -232,7 +232,7 @@ public final class DroneStrikeEffects {
         if (plugin.explosionRegen() != null) {
             plugin.explosionRegen().blastTerrain(at, 7.5);
         }
-        w.createExplosion(at, 6.0f, false, true, null);
+        w.createExplosion(at, 6.0f, false, false, null);
         if (plugin.blastShock() != null) {
             plugin.blastShock().apply(at.clone(), 40.0, profile.shockStrength());
         }

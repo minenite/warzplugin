@@ -281,9 +281,15 @@ public final class ExplosionRegenService implements Listener {
     }
 
     /**
-     * Snapshot (if regen is on) then actually destroy blocks.
-     * CardForge {@code createExplosion(breakBlocks=true)} uses MOB + null source,
-     * so NeoForge keeps the terrain intact — LAW / Javelin / nades never cratered.
+     * Destroys the terrain and records what it took, so regen can put it back.
+     *
+     * <p>This is the only thing that should break blocks in a blast. Vanilla
+     * explosions are fired alongside it for damage and knockback with block
+     * breaking off, for two reasons: a vanilla explosion drops what it breaks,
+     * scattering the crater across the ground as items, and the blocks it takes
+     * are not the blocks this carve recorded - so anything vanilla removed at the
+     * rim was never captured and never came back, leaving a permanent ragged edge
+     * around an otherwise healed crater.
      */
     public void blastTerrain(Location center, double radius) {
         if (center == null || center.getWorld() == null || radius <= 0) {
