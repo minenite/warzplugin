@@ -226,6 +226,10 @@ public final class GlassService {
         if (block == null) {
             return false;
         }
+        org.bukkit.plugin.Plugin owner = org.bukkit.Bukkit.getPluginManager().getPlugin("WarzPlugin");
+        if (owner instanceof WarzPlugin warz && warz.transientBlocks() != null) {
+            warz.transientBlocks().rememberShotGlass(block);
+        }
         Material type = block.getType();
         String name = type.name();
         boolean glass = type == Material.GLASS || type == Material.GLASS_PANE
@@ -961,6 +965,10 @@ public final class GlassService {
     }
 
     private void shatterQuiet(Block block, GlassType type) {
+        // Tactical glass is restored by rememberShotOut/restoreShotOut below,
+        // which also puts the pane back on the tactical register. Journalling it
+        // with the transient blocks as well would have two systems rebuilding the
+        // same pane, one of them as plain glass.
         Location at = block.getLocation().add(0.5, 0.5, 0.5);
         World world = block.getWorld();
         block.setType(Material.AIR, false);

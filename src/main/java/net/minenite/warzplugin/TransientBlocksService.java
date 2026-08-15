@@ -20,6 +20,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.block.BlockMultiPlaceEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.scheduler.BukkitTask;
@@ -131,6 +133,31 @@ public final class TransientBlocksService implements Listener {
         }
     }
 
+    /**
+     * Without the builder tag, the only thing a player may break by hand is
+     * glass. Everything else on the map is somebody's build, and a wipe should
+     * not be able to take it apart pane by pane. Placing is untouched, and so is
+     * interacting - chests, doors and workbenches all still work.
+     *
+     * <p>Runs at LOWEST so the block is still standing when the break is refused;
+     * the bookkeeping below still happens at MONITOR for the breaks that survive.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onBreakRestrict(BlockBreakEvent event) {
+        if (!enabled) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (isBuilder(player) || player.getGameMode() == org.bukkit.GameMode.CREATIVE) {
+            return;
+        }
+        if (isGlass(event.getBlock().getType())) {
+            return;
+        }
+        event.setCancelled(true);
+        player.sendActionBar(org.bukkit.ChatColor.RED + "Only glass can be broken without the builder tag.");
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         if (!enabled) {
@@ -140,6 +167,51 @@ public final class TransientBlocksService implements Listener {
         Block block = event.getBlock();
         if (isBuilder(player)) {
             commit(block);
+            return;
+        }
+        rememberOriginal(block);
+    }
+
+    /**
+     * Glass taken out by a blast is remembered the same way a hand break is, so
+     * the window is back after the next restart. The rest of the crater is the
+     * explosion regen service's business, not this one's.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        rememberGlass(event.blockList());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        rememberGlass(event.blockList());
+    }
+
+    private void rememberGlass(java.util.List<Block> blocks) {
+        if (!enabled || blocks == null) {
+            return;
+        }
+        for (Block block : blocks) {
+            if (isGlass(block.getType())) {
+                rememberOriginal(block);
+            }
+        }
+    }
+
+    /** Every glass and pane, tactical or vanilla, plus tinted and iron bars. */
+    public static boolean isGlass(org.bukkit.Material type) {
+        if (type == null) {
+            return false;
+        }
+        String name = type.name();
+        return name.endsWith("_GLASS") || name.endsWith("_GLASS_PANE")
+                || type == org.bukkit.Material.GLASS || type == org.bukkit.Material.GLASS_PANE
+                || type == org.bukkit.Material.TINTED_GLASS;
+    }
+
+    /** Called by the gun code when a shot removes a pane. */
+    public void rememberShotGlass(Block block) {
+        if (!enabled || block == null || !isGlass(block.getType())) {
             return;
         }
         rememberOriginal(block);

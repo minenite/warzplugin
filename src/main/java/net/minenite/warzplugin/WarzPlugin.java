@@ -441,6 +441,10 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     }
 
     /** DEV+ (or op) — create/delete loot chests, zones, and force reloot. */
+    public TransientBlocksService transientBlocks() {
+        return this.transientBlocks;
+    }
+
     public boolean mayManageLoot(Player player) {
         if (player.isOp()) {
             return true;
