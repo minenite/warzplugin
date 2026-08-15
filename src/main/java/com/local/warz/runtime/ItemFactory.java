@@ -2817,6 +2817,7 @@ public final class ItemFactory {
         lore.add(colorize("&7Dive mask — wear on head"));
         lore.add(colorize("&eWith Scuba Tank &7→ breathe underwater"));
         meta.lore(lore);
+        applySuitEquippable(meta, org.bukkit.inventory.EquipmentSlot.HEAD, "scuba");
         stack.setItemMeta(meta);
         return stack;
     }
@@ -2831,6 +2832,7 @@ public final class ItemFactory {
         lore.add(colorize("&7Air tank — wear on torso"));
         lore.add(colorize("&eWith Scuba Helmet &7→ breathe underwater"));
         meta.lore(lore);
+        applySuitEquippable(meta, org.bukkit.inventory.EquipmentSlot.CHEST, "scuba");
         stack.setItemMeta(meta);
         return stack;
     }
@@ -2845,6 +2847,7 @@ public final class ItemFactory {
         lore.add(colorize("&7Insulated wetsuit bottoms"));
         lore.add(colorize("&7Wear with boots to hold body heat in water"));
         meta.lore(lore);
+        applySuitEquippable(meta, org.bukkit.inventory.EquipmentSlot.LEGS, "scuba");
         stack.setItemMeta(meta);
         return stack;
     }
@@ -2859,6 +2862,7 @@ public final class ItemFactory {
         lore.add(colorize("&7Insulated wetsuit footwear"));
         lore.add(colorize("&7Wear with leggings to hold body heat in water"));
         meta.lore(lore);
+        applySuitEquippable(meta, org.bukkit.inventory.EquipmentSlot.FEET, "scuba");
         stack.setItemMeta(meta);
         return stack;
     }
@@ -3391,6 +3395,7 @@ public final class ItemFactory {
         ItemMeta meta = stack.getItemMeta();
         meta.setMaxStackSize(METAL_STACK_MAX);
         meta.getPersistentDataContainer().set(metalKey, PersistentDataType.BYTE, (byte) 1);
+        applyCmd(meta, CMD_METAL, "metal");
         meta.displayName(colorize("&fMetal"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&8metal"));
@@ -3496,6 +3501,8 @@ public final class ItemFactory {
     /** Custom model data range for operator UAV hotbar icons (companion item models). */
     /** Flare cartridge. The art has been in the pack all along, unreferenced. */
     public static final int CMD_FLARE_CARTRIDGE = 2601;
+    /** Scrap metal. Had no model at all - it showed as a plain iron ingot. */
+    public static final int CMD_METAL = 4350;
     public static final int CMD_DRONE_FIRE = 4101;
     public static final int CMD_DRONE_ORBIT = 4102;
     public static final int CMD_DRONE_CONTROL = 4103;

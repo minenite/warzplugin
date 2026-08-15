@@ -21,7 +21,7 @@ public enum WarzFoodType {
     DEW("dew", "&aDew", ItemFactory.CMD_FOOD_DEW,
             0.0, 0, true, true, 999L, true,
             "mountain_dew", "mtdew"),
-    GOLDEN_APPLE("golden_apple", "&6Golden Apple", ItemFactory.CMD_FOOD_GOLDEN_APPLE,
+    GOLDEN_APPLE("golden_apple", "&eLemon", ItemFactory.CMD_FOOD_GOLDEN_APPLE,
             0.0, 0, false, false, 99_999L, false,
             "gapple", "gold_apple");
 
