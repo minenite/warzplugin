@@ -32,23 +32,17 @@ public final class RoundRegistry {
         Path dir = roundsDir();
         try {
             Files.createDirectories(dir);
-            if (hasAnyFile(dir)) {
-                return;
-            }
+            // Seed per file, not "only when the folder is empty". Bailing on the
+            // first existing file meant a server that had ever started could never
+            // receive a round type added later - the flare cartridge and the UAV
+            // munitions shipped in the jar and never appeared. Existing files are
+            // still left alone, so local edits survive.
             extractDefaultsFromJar("defaults/rounds", dir);
         } catch (IOException e) {
             plugin.getLogger().severe("Failed seeding rounds: " + e.getMessage());
         }
     }
 
-    private boolean hasAnyFile(Path dir) throws IOException {
-        if (!Files.isDirectory(dir)) {
-            return false;
-        }
-        try (Stream<Path> stream = Files.list(dir)) {
-            return stream.anyMatch(Files::isRegularFile);
-        }
-    }
 
     private void extractDefaultsFromJar(String resourceFolder, Path destination) throws IOException {
         Path codeSource;

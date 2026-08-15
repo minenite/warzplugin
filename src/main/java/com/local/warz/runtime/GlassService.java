@@ -40,12 +40,91 @@ public final class GlassService {
     private final File file;
     private final Map<String, String> placed = new ConcurrentHashMap<>();
     private final Map<String, Double> damage = new ConcurrentHashMap<>();
+    /**
+     * Glass shot out of the world, by position and type. Placed glass is part of
+     * the build; a firefight should not permanently delete it, so it is put back
+     * when the server next starts. Glass a player breaks by hand is a decision,
+     * not damage, and is not recorded here.
+     */
+    private final Map<String, String> shotOut = new ConcurrentHashMap<>();
     private final Map<String, List<Impact>> impacts = new ConcurrentHashMap<>();
 
     public GlassService(WarzPlugin plugin) {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "tactical-glass.yml");
         load();
+    }
+
+    /**
+     * Put back every pane the guns shot out, then forget them.
+     *
+     * Runs a tick after startup so the worlds are loaded and the chunks can be
+     * fetched. Anything the position no longer allows - the block is occupied
+     * now, the world is gone - is dropped rather than forced.
+     */
+    public void restoreShotOut() {
+        if (shotOut.isEmpty()) {
+            return;
+        }
+        Map<String, String> pending = new java.util.HashMap<>(shotOut);
+        shotOut.clear();
+        int restored = 0;
+        for (var entry : pending.entrySet()) {
+            Location at = parseKey(entry.getKey());
+            GlassType type = GlassType.fromId(entry.getValue());
+            if (at == null || at.getWorld() == null || type == null) {
+                continue;
+            }
+            Block block = at.getBlock();
+            if (!block.getType().isAir()) {
+                // Something was built there in the meantime; leave it alone.
+                continue;
+            }
+            boolean pane = placedAsPane(at);
+            block.setType(pane ? type.paneMaterial() : type.blockMaterial(), false);
+            mark(block, type);
+            restored++;
+        }
+        save();
+        if (restored > 0) {
+            plugin.getLogger().info("Tactical glass: rebuilt " + restored + " pane(s) shot out before the restart.");
+        }
+    }
+
+    /** A pane if its neighbours are panes, otherwise a full block. */
+    private boolean placedAsPane(Location at) {
+        for (org.bukkit.block.BlockFace face : new org.bukkit.block.BlockFace[]{
+                org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH,
+                org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST,
+                org.bukkit.block.BlockFace.UP, org.bukkit.block.BlockFace.DOWN}) {
+            Material neighbour = at.getBlock().getRelative(face).getType();
+            if (neighbour.name().endsWith("_PANE")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Location parseKey(String key) {
+        int z = key.lastIndexOf(':');
+        int y = key.lastIndexOf(':', z - 1);
+        int x = key.lastIndexOf(':', y - 1);
+        if (x < 0) {
+            return null;
+        }
+        World world = org.bukkit.Bukkit.getWorld(
+                org.bukkit.NamespacedKey.fromString(key.substring(0, x)));
+        if (world == null) {
+            return null;
+        }
+        try {
+            return new Location(world,
+                    Integer.parseInt(key.substring(x + 1, y)),
+                    Integer.parseInt(key.substring(y + 1, z)),
+                    Integer.parseInt(key.substring(z + 1)));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public void registerChannel() {
@@ -258,6 +337,7 @@ public final class GlassService {
 
         if (destroy) {
             shatterQuiet(block, type);
+            rememberShotOut(block, type);
             unmark(block);
             // Brittle collapses still let the round continue to the far side
             if (canPen || type.shatter() == GlassType.Shatter.INSTANT
@@ -316,6 +396,7 @@ public final class GlassService {
         broadcastUpsert(next, nextType, list, damageRatio);
         if (shouldDestroy(nextType, taken, maxHp, true, shot, list.size())) {
             shatterQuiet(next, nextType);
+            rememberShotOut(next, nextType);
             unmark(next);
         } else {
             save();
@@ -871,6 +952,14 @@ public final class GlassService {
         }
     }
 
+    /** Remember a pane the guns removed, so a restart can rebuild it. */
+    private void rememberShotOut(Block block, GlassType type) {
+        if (block == null || type == null) {
+            return;
+        }
+        shotOut.put(key(block.getLocation()), type.id());
+    }
+
     private void shatterQuiet(Block block, GlassType type) {
         Location at = block.getLocation().add(0.5, 0.5, 0.5);
         World world = block.getWorld();
@@ -1077,6 +1166,7 @@ public final class GlassService {
         placed.clear();
         damage.clear();
         impacts.clear();
+        shotOut.clear();
         if (!file.exists()) {
             return;
         }
@@ -1086,6 +1176,14 @@ public final class GlassService {
             if (sec != null) {
                 for (String k : sec.getKeys(false)) {
                     placed.put(k, sec.getString(k));
+                }
+            }
+        }
+        if (yaml.isConfigurationSection("shot-out")) {
+            var sec = yaml.getConfigurationSection("shot-out");
+            if (sec != null) {
+                for (String k : sec.getKeys(false)) {
+                    shotOut.put(k, sec.getString(k));
                 }
             }
         }
@@ -1131,6 +1229,9 @@ public final class GlassService {
             if (placed.containsKey(e.getKey())) {
                 yaml.set("damage." + e.getKey(), e.getValue());
             }
+        }
+        for (var e : shotOut.entrySet()) {
+            yaml.set("shot-out." + e.getKey(), e.getValue());
         }
         for (var e : impacts.entrySet()) {
             if (!placed.containsKey(e.getKey()) || e.getValue() == null || e.getValue().isEmpty()) {

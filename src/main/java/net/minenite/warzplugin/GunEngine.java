@@ -199,6 +199,9 @@ final class GunEngine {
         Bukkit.getPluginManager().registerEvents(new GunWorkbenchListener(plugin), plugin);
         this.glass = new GlassService(plugin);
         glass.registerChannel();
+        // A tick later the worlds exist and the chunks can be fetched, so panes
+        // shot out before the restart can be put back.
+        Bukkit.getScheduler().runTask(plugin, glass::restoreShotOut);
         Bukkit.getPluginManager().registerEvents(new GlassListener(plugin), plugin);
         this.medical = new MedicalService(plugin);
         Bukkit.getPluginManager().registerEvents(medical, plugin);

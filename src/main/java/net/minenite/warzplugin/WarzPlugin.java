@@ -1048,7 +1048,7 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
     /**
      * Hotbar: 0 knife, 1 USP-45, 2 bandages×4, 3 beans×4, 4 map, 5 splints×2,
      * 6 water×2, 7 pasta×2, 8 compass.
-     * Inv: slot above USP (10) = full 9mm mag; top-right (35) = blood bag.
+     * Inv: slots above USP (10, 11) = two full 9mm mags; top-right (35) = blood bag.
      * Idempotent — only fills missing / wrong slots.
      */
     private void ensureStarterKit(Player player) {
@@ -1069,15 +1069,18 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 registry.get("usp45").ifPresent(def -> inv.setItem(1, items.create(def, 1)));
             }
 
-            // Slot directly above hotbar slot 1.
-            final int magSlot = 1 + 9;
-            ItemStack aboveGun = inv.getItem(magSlot);
-            if (!isStarterLoaded9mmMag(aboveGun)) {
-                inv.setItem(magSlot, items.createMagazine(
-                        com.local.warz.runtime.MagazineType.PISTOL_15,
-                        com.local.warz.runtime.MagazineType.PISTOL_15.capacity(),
-                        "pistol_fmj",
-                        1));
+            // Two loaded 9mm mags, in the slots directly above the pistol. One
+            // magazine is fifteen rounds; a spare is the difference between
+            // finishing a fight and reloading loose ammo in the middle of it.
+            for (int magSlot : new int[]{1 + 9, 2 + 9}) {
+                ItemStack aboveGun = inv.getItem(magSlot);
+                if (!isStarterLoaded9mmMag(aboveGun)) {
+                    inv.setItem(magSlot, items.createMagazine(
+                            com.local.warz.runtime.MagazineType.PISTOL_15,
+                            com.local.warz.runtime.MagazineType.PISTOL_15.capacity(),
+                            "pistol_fmj",
+                            1));
+                }
             }
 
             ItemStack slot2 = inv.getItem(2);
