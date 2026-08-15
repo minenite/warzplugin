@@ -87,6 +87,9 @@ public final class WorldFreezeListener implements Listener {
         if (!enabled || !physics) {
             return;
         }
+        if (isFire(event.getBlock().getType()) || isFire(event.getChangedType())) {
+            return;
+        }
         event.setCancelled(true);
     }
 
@@ -198,7 +201,18 @@ public final class WorldFreezeListener implements Listener {
         if (!enabled || !fadeDecay) {
             return;
         }
+        // Fire burning out is a fade. Freezing it meant every flame this server
+        // lit - dragon's breath, molotovs, flares, crash sites - burned for ever,
+        // because nothing else ever removes them. The freeze is meant to stop the
+        // terrain rotting, not to make fire permanent.
+        if (isFire(event.getBlock().getType())) {
+            return;
+        }
         event.setCancelled(true);
+    }
+
+    private static boolean isFire(org.bukkit.Material type) {
+        return type == org.bukkit.Material.FIRE || type == org.bukkit.Material.SOUL_FIRE;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
