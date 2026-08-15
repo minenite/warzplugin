@@ -422,6 +422,21 @@ public final class GiveGunMenuService {
         inv.setItem(49, button(Material.ARROW, "&eBack", "&7Return to Gear"));
     }
 
+    /**
+     * Where the airframes sit on the Gear page. Shared with the click handler:
+     * these were two separate lists, and the click side only covered 28..33 with
+     * a slot-minus-28 index, so the seventh airframe - the X-37B on slot 35 -
+     * was drawn but could not be taken.
+     */
+    private static final int[] DRONE_SLOTS = {28, 29, 30, 31, 32, 33, 35};
+
+    private static int droneIndexForSlot(int slot) {
+        for (int i = 0; i < DRONE_SLOTS.length; i++) {
+            if (DRONE_SLOTS[i] == slot) return i;
+        }
+        return -1;
+    }
+
     private void fillGear(Inventory inv) {
         inv.setItem(10, helmetIcon(plugin.items().createNvgHelmet(NvgGear.Variant.MULTI)));
         inv.setItem(11, button(Material.LIME_DYE, "&aNODS Colors",
@@ -429,7 +444,7 @@ public final class GiveGunMenuService {
                 "&eClick &7— fixed phosphor (H = on/off)"));
 
         // Airframes (mesh / systems vary — tanks, sensors, weapons, cargo)
-        int[] droneSlots = {28, 29, 30, 31, 32, 33, 35};
+        int[] droneSlots = DRONE_SLOTS;
         BigDroneType[] drones = BigDroneType.values();
         for (int i = 0; i < drones.length && i < droneSlots.length; i++) {
             ItemStack drone = plugin.items().createBigDrone(drones[i]);
@@ -1146,11 +1161,11 @@ public final class GiveGunMenuService {
                     give(player, plugin.items().createRadiolink());
                     player.sendMessage(Component.text("Gave Radiolink", NamedTextColor.LIGHT_PURPLE));
                 }
-            } else if (slot >= 28 && slot <= 33) {
+            } else if (droneIndexForSlot(slot) >= 0) {
                 if (left || right) {
                     BigDroneType[] drones = BigDroneType.values();
-                    int idx = slot - 28;
-                    if (idx >= 0 && idx < drones.length) {
+                    int idx = droneIndexForSlot(slot);
+                    if (idx < drones.length) {
                         BigDroneType t = drones[idx];
                         give(player, plugin.items().createBigDrone(t));
                         player.sendMessage(Component.text("Gave " + t.displayName(), NamedTextColor.AQUA));
