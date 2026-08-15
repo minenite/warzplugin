@@ -34,7 +34,6 @@ import org.bukkit.scheduler.BukkitTask;
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -247,13 +246,16 @@ public final class RazorWireService implements Listener {
         // ShearsBreakWebs: ITEM_BREAK → ENTITY_ITEM_BREAK, volume 10, pitch 1
         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 10.0f, 1.0f);
 
+        // addItem merges on vanilla similarity, so a reclaimed coil opened a new
+        // slot next to wire that differed in any meta detail - anything placed
+        // before razor wire had a model, for one. addItemMerging compares by what
+        // the item *is*, which is what makes reclaiming stack onto what you hold.
         ItemStack wire = plugin.items().createRazorWire(1);
-        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(wire);
-        if (!leftover.isEmpty()) {
-            for (ItemStack drop : leftover.values()) {
-                block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.2, 0.5), drop);
-            }
+        ItemStack leftover = plugin.items().addItemMerging(player.getInventory(), wire);
+        if (leftover != null && leftover.getAmount() > 0) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.2, 0.5), leftover);
         }
+        player.updateInventory();
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

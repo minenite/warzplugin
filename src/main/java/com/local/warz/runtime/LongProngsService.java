@@ -125,15 +125,19 @@ public final class LongProngsService implements Listener {
         if (hand.getAmount() > 1) {
             hand.setAmount(hand.getAmount() - 1);
             player.getInventory().setItemInMainHand(hand);
-            var left = player.getInventory().addItem(empty);
-            left.values().forEach(s -> player.getWorld().dropItemNaturally(player.getLocation(), s));
+            ItemStack left = plugin.items().addItemMerging(player.getInventory(), empty);
+            if (left != null && left.getAmount() > 0) {
+                player.getWorld().dropItemNaturally(player.getLocation(), left);
+            }
         } else {
             player.getInventory().setItemInMainHand(empty);
         }
 
         ItemStack shards = plugin.items().createObsidianShards(SHARDS_PER_QUENCH);
-        var leftover = player.getInventory().addItem(shards);
-        leftover.values().forEach(s -> player.getWorld().dropItemNaturally(player.getLocation(), s));
+        ItemStack leftover = plugin.items().addItemMerging(player.getInventory(), shards);
+        if (leftover != null && leftover.getAmount() > 0) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
 
         Location at = cauldron.getLocation().add(0.5, 0.9, 0.5);
         player.getWorld().playSound(at, Sound.BLOCK_LAVA_EXTINGUISH, 1f, 1.1f);
