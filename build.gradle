@@ -21,3 +21,50 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 25
 }
+
+// Stamp the jar with the commit it was built from. Deploys print this, and
+// without it "which jar is actually running" is guesswork - which has already
+// cost a debugging round on this network more than once.
+def gitOut = { String... cmd ->
+    try {
+        def proc = (['git'] + (cmd as List)).execute(null, projectDir)
+        proc.waitFor()
+        return proc.exitValue() == 0 ? proc.text.trim() : 'unknown'
+    } catch (Exception ignored) {
+        return 'unknown'
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+            'Implementation-Title': 'WarzPlugin',
+            'Implementation-Version': project.version,
+            'Build-Commit': gitOut('rev-parse', 'HEAD'),
+            'Build-Branch': gitOut('rev-parse', '--abbrev-ref', 'HEAD'),
+            'Build-Dirty': gitOut('status', '--porcelain').isEmpty() ? 'false' : 'true',
+            'Build-Time': java.time.Instant.now().toString()
+        )
+    }
+}
+
+// The pack and the plugin drift silently: a CustomModelData only renders if the
+// pack has an item definition to dispatch on. Fail the build instead.
+tasks.register('checkPackCoverage', Exec) {
+    description = 'Verify every model the plugin asks for exists in the resource pack'
+    group = 'verification'
+    def pack = file("${rootDir}/../MineniteWARZ")
+    onlyIf { pack.exists() }
+    commandLine 'python3', "${projectDir}/tools/check_pack_coverage.py", '--pack', pack.absolutePath
+}
+
+// Menu icons and click handlers are two hand-maintained lists; when they drift
+// an item is either invisible or hands out the wrong thing.
+tasks.register('checkMenuSlots', Exec) {
+    description = 'Verify every menu icon has a handler and no icon is drawn over another'
+    group = 'verification'
+    commandLine 'python3', "${projectDir}/tools/check_menu_slots.py"
+}
+
+tasks.named('check') { dependsOn 'checkPackCoverage', 'checkMenuSlots' }
+tasks.named('build') { dependsOn 'checkPackCoverage', 'checkMenuSlots' }
