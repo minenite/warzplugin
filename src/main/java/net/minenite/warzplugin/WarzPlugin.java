@@ -792,6 +792,32 @@ public final class WarzPlugin extends JavaPlugin implements Listener {
                 + ChatColor.GRAY + " chests. Timer reset to 600s.");
     }
 
+    /**
+     * Console dispatch for /warz. Players reach these through
+     * PlayerCommandPreprocessEvent, but the console has no such event, so every
+     * /warz typed at the server prompt fell through to Bukkit's default handler
+     * and printed the usage line - the subcommands were unreachable from there.
+     */
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender,
+                             org.bukkit.command.Command command, String label, String[] args) {
+        if (!command.getName().equalsIgnoreCase("warz")) {
+            return false;
+        }
+        if (sender instanceof Player player) {
+            String[] parts = new String[args.length + 1];
+            parts[0] = "/warz";
+            System.arraycopy(args, 0, parts, 1, args.length);
+            handleWarz(player, parts);
+            return true;
+        }
+        if (this.guns == null) {
+            sender.sendMessage("WarZ gun engine is not loaded.");
+            return true;
+        }
+        return this.guns.handleWarz(sender, args);
+    }
+
     private void handleWarz(Player player, String[] parts) {
         if (parts.length < 2) {
             sendWarzHelp(player);

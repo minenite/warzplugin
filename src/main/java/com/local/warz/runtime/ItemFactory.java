@@ -1964,16 +1964,19 @@ public final class ItemFactory {
         }
         int wanted = Math.max(1, Math.min(99, max));
         try {
-            if (wanted == stack.getType().getMaxStackSize()) {
-                // Carrying the component is not the same as not carrying it, even
-                // when the number matches: components are part of an item's
-                // identity, so a round stamped "max 64" will not merge with an
-                // identical round that simply inherits 64 from its material. That
-                // is how stacking broke - two piles of the same ammo sitting side
-                // by side, and shift-click refusing to combine them.
-                stack.unsetData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE);
-                return;
-            }
+            // Always write the component; never remove it.
+            //
+            // Unsetting it used to look right - if the number matches the
+            // material's own default, carrying the component is redundant, and
+            // components are part of item identity. But unsetData does not mean
+            // "inherit the default" here: it records an explicit removal in the
+            // patch, and this server resolves a removed max_stack_size to 1. The
+            // measurement was unambiguous - a freshly built round reported
+            // getMaxStackSize() == 1, isSimilar() == false against an identical
+            // round, and two of them landed in two slots.
+            //
+            // Every stack of a given item is built through this same call, so
+            // they all carry the same value and merge with each other.
             stack.setData(io.papermc.paper.datacomponent.DataComponentTypes.MAX_STACK_SIZE, wanted);
         } catch (Throwable ignored) {
         }
