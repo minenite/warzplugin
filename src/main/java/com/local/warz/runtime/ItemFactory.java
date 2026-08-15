@@ -150,14 +150,6 @@ public final class ItemFactory {
     /** Inventory dye — matches hazmat skin ochre (worn look uses equipment texture). */
     private static final Color HAZMAT_COLOR = Color.fromRGB(0xD9, 0x9A, 0x28);
     private static final Color FIRE_SUIT_COLOR = Color.fromRGB(0xBE, 0xC3, 0xCD);
-    /**
-     * Hazmat inventory icons. These were dyed leather with no CMD, so the icon was
-     * an orange leather helmet rather than the hazmat model the pack ships.
-     */
-    public static final int CMD_HAZMAT_HELMET = 4300;
-    public static final int CMD_HAZMAT_CHEST = 4301;
-    public static final int CMD_HAZMAT_LEGS = 4302;
-    public static final int CMD_HAZMAT_BOOTS = 4303;
     /** NiftyBlocks fire suit inventory icons (leather CMD → companion models). */
     public static final int CMD_FIRE_HELMET = 4310;
     public static final int CMD_FIRE_CHEST = 4311;
@@ -2901,7 +2893,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatHelmet() {
         return createSuitPiece(Material.LEATHER_HELMET, HAZMAT_COLOR, SUIT_HAZMAT_HELMET,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.HEAD, CMD_HAZMAT_HELMET,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.HEAD,
                 "&6Hazmat Helmet",
                 "&7Sealed orange respirator hood",
                 "&aBlocks hydrazine vapor (with suit)");
@@ -2909,7 +2901,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatChestplate() {
         return createSuitPiece(Material.LEATHER_CHESTPLATE, HAZMAT_COLOR, SUIT_HAZMAT_CHEST,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.CHEST, CMD_HAZMAT_CHEST,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.CHEST,
                 "&6Hazmat Suit",
                 "&7Level-A orange chemical oversuit",
                 "&aImmune to X-37B hydrazine leak while worn");
@@ -2917,7 +2909,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatLeggings() {
         return createSuitPiece(Material.LEATHER_LEGGINGS, HAZMAT_COLOR, SUIT_HAZMAT_LEGS,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.LEGS, CMD_HAZMAT_LEGS,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.LEGS,
                 "&6Hazmat Leggings",
                 "&7Chemical-resistant trousers",
                 "&7Part of the hazmat ensemble");
@@ -2925,7 +2917,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatBoots() {
         return createSuitPiece(Material.LEATHER_BOOTS, HAZMAT_COLOR, SUIT_HAZMAT_BOOTS,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.FEET, CMD_HAZMAT_BOOTS,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.FEET,
                 "&6Hazmat Boots",
                 "&7Sealed overboots",
                 "&7Part of the hazmat ensemble");
