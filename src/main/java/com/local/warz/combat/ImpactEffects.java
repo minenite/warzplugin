@@ -28,24 +28,33 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ImpactEffects {
-    /** Ground fire refresh window (~45s). */
-    private static final int FIRE_LINGER_TICKS = 20 * 45;
-    private static final int FIRE_REFRESH_PERIOD = 10;
+    /**
+     * Ground flame sheet. This ran for forty-five seconds, re-drawing flames and
+     * re-igniting anything standing in them every ten ticks, which is what made a
+     * dragon's breath shot leave a burning patch long after the fight moved on.
+     * A shot now flares and is gone.
+     */
+    private static final int FIRE_LINGER_TICKS = 20;
+    private static final int FIRE_REFRESH_PERIOD = 5;
     private static final int ENTITY_FIRE_TICKS = 20 * 14;
     /**
      * Classic molotov flame cloud (old gun config):
      * {@code 6.0,0.1,200,FLAME,count=5,offset=2:0.4:2,speed=0.0}
      */
     private static final double CLASSIC_FLAME_Y = 0.1;
-    private static final int CLASSIC_FLAME_DURATION_TICKS = 200;
+    /** Dense flame cloud. Was 200 ticks - ten seconds of standing fire. */
+    private static final int CLASSIC_FLAME_DURATION_TICKS = 20;
     private static final int CLASSIC_FLAME_PERIOD_TICKS = 2; // 0.1s
     private static final int CLASSIC_FLAME_COUNT = 5;
     private static final double CLASSIC_FLAME_OX = 2.0;
     private static final double CLASSIC_FLAME_OY = 0.4;
     private static final double CLASSIC_FLAME_OZ = 2.0;
     private static final double CLASSIC_FLAME_SPEED = 0.0;
-    /** Smoke column sits above the flame sheet and outlives the dense flame phase. */
-    private static final int FIRE_SMOKE_DURATION_TICKS = 20 * 22;
+    /**
+     * Smoke outlives the flames on purpose - a shot leaves a puff hanging rather
+     * than vanishing outright - but not by twenty seconds.
+     */
+    private static final int FIRE_SMOKE_DURATION_TICKS = 20 * 4;
     private static final int FIRE_SMOKE_PERIOD_TICKS = 3;
     /** Within this distance, LOS is skipped (floor rays false-negative); facing still applies. */
     private static final double FLASH_CLOSE_ALWAYS = 2.75;
