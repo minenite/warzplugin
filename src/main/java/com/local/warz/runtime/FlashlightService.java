@@ -14,10 +14,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
@@ -42,6 +45,7 @@ public final class FlashlightService implements Listener {
     private final WarzPlugin plugin;
     private final Map<UUID, Set<Block>> activeLights = new ConcurrentHashMap<>();
     private final Map<UUID, Long> toggleCooldownMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> inventoryClickMs = new ConcurrentHashMap<>();
     private BukkitTask task;
     private int strobePhase;
 
@@ -51,10 +55,15 @@ public final class FlashlightService implements Listener {
 
     public void start() {
         if (task != null) {
-            return;
+            task.cancel();
+            task = null;
         }
-        // Every 2 ticks — fewer light-engine rebuilds (Iris soft/fuzzy thrash)
-        task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 2L);
+        // Old path planted vanilla LIGHT blocks along the aim ray. That reads as
+        // Minecraft blobs and fights Complementary. MineniteClient draws a real
+        // look-cone instead, so leftover blocks are just swept.
+        for (UUID id : activeLights.keySet().toArray(new UUID[0])) {
+            clear(id);
+        }
     }
 
     public void stop() {
@@ -66,6 +75,27 @@ public final class FlashlightService implements Listener {
             clear(id);
         }
         toggleCooldownMs.clear();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            inventoryClickMs.put(player.getUniqueId(), System.currentTimeMillis());
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                clearEmptyStacks(player);
+                player.updateInventory();
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        inventoryClickMs.put(player.getUniqueId(), System.currentTimeMillis());
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            clearEmptyStacks(player);
+            player.updateInventory();
+        });
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -81,6 +111,12 @@ public final class FlashlightService implements Listener {
         }
         Player player = event.getPlayer();
         if (plugin.bigDrone() != null && plugin.bigDrone().isPiloting(player)) {
+            return;
+        }
+        // CardForge still fires interact while a slot is being clicked. That is
+        // how an offhand light kept toggling from the old hotbar cell.
+        Long invAt = inventoryClickMs.get(player.getUniqueId());
+        if (invAt != null && System.currentTimeMillis() - invAt < 400L) {
             return;
         }
         ItemStack stack = hand == EquipmentSlot.OFF_HAND
@@ -119,11 +155,7 @@ public final class FlashlightService implements Listener {
 
         boolean next = !plugin.items().isFlashlightOn(stack);
         plugin.items().setFlashlightOn(stack, next);
-        if (offHand) {
-            player.getInventory().setItemInOffHand(stack);
-        } else {
-            player.getInventory().setItemInMainHand(stack);
-        }
+        writeFlashlight(player, stack, offHand);
         player.sendActionBar(net.kyori.adventure.text.Component.text(
                 next ? "Flashlight ON" : "Flashlight OFF",
                 next ? net.kyori.adventure.text.format.NamedTextColor.YELLOW
@@ -134,10 +166,57 @@ public final class FlashlightService implements Listener {
         return true;
     }
 
+    /** Write the toggled stack only into a slot that already holds a flashlight. */
+    private void writeFlashlight(Player player, ItemStack stack, boolean preferOffHand) {
+        PlayerInventory inv = player.getInventory();
+        if (preferOffHand && plugin.items().isFlashlight(inv.getItemInOffHand())) {
+            inv.setItemInOffHand(stack);
+            return;
+        }
+        if (!preferOffHand && plugin.items().isFlashlight(inv.getItemInMainHand())) {
+            inv.setItemInMainHand(stack);
+            return;
+        }
+        if (plugin.items().isFlashlight(inv.getItemInOffHand())) {
+            inv.setItemInOffHand(stack);
+            return;
+        }
+        if (plugin.items().isFlashlight(inv.getItemInMainHand())) {
+            inv.setItemInMainHand(stack);
+            return;
+        }
+        for (int i = 0; i < 36; i++) {
+            if (plugin.items().isFlashlight(inv.getItem(i))) {
+                inv.setItem(i, stack);
+                return;
+            }
+        }
+    }
+
+    private static void clearEmptyStacks(Player player) {
+        PlayerInventory inv = player.getInventory();
+        for (int i = 0; i < inv.getSize(); i++) {
+            ItemStack it = inv.getItem(i);
+            if (it != null && (it.getType().isAir() || it.getAmount() <= 0)) {
+                inv.setItem(i, null);
+            }
+        }
+        ItemStack off = inv.getItemInOffHand();
+        if (off != null && (off.getType().isAir() || off.getAmount() <= 0)) {
+            inv.setItemInOffHand(null);
+        }
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor != null && (cursor.getType().isAir() || cursor.getAmount() <= 0)) {
+            player.setItemOnCursor(null);
+        }
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        clear(event.getPlayer().getUniqueId());
-        toggleCooldownMs.remove(event.getPlayer().getUniqueId());
+        UUID id = event.getPlayer().getUniqueId();
+        clear(id);
+        toggleCooldownMs.remove(id);
+        inventoryClickMs.remove(id);
     }
 
     private void tick() {

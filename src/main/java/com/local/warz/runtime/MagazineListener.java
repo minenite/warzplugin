@@ -13,6 +13,9 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
+import org.bukkit.Sound;
+import org.bukkit.entity.Item;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
@@ -38,8 +41,68 @@ public final class MagazineListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        // Corpse loot owns shift-click so ammo/food merge instead of sitting
+        // in a new slot, and so a loaded mag is taken rather than unloaded.
+        var corpses = plugin.corpses();
+        if (event.isShiftClick() && corpses != null
+                && corpses.isCorpseInventory(event.getView().getTopInventory())) {
+            return;
+        }
         ItemStack cursor = event.getCursor();
         ItemStack current = event.getCurrentItem();
+        if (event.isShiftClick() && plugin.items().isShiftMergeCandidate(current)) {
+            org.bukkit.inventory.Inventory clicked = event.getClickedInventory();
+            if (clicked instanceof PlayerInventory
+                    && event.getView().getTopInventory() instanceof CraftingInventory) {
+                // Own inventory (E): hotbar ↔ storage. Never dump into the 2x2 craft
+                // grid — that left a ghost in the old slot / offhand.
+                int slot = event.getSlot();
+                if (slot >= 0 && slot < 36) {
+                    event.setCancelled(true);
+                    int from = slot < 9 ? 9 : 0;
+                    int to = slot < 9 ? 36 : 9;
+                    ItemStack leftover = plugin.items().addItemMerging(
+                            player.getInventory(), current.clone(), from, to);
+                    event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
+                    player.updateInventory();
+                }
+                return;
+            }
+            org.bukkit.inventory.Inventory dest = clicked instanceof PlayerInventory
+                    ? event.getView().getTopInventory()
+                    : player.getInventory();
+            if (dest != null && dest != clicked) {
+                event.setCancelled(true);
+                ItemStack moving = current.clone();
+                ItemStack leftover = plugin.items().addItemMerging(dest, moving);
+                event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
+                player.updateInventory();
+                return;
+            }
+        }
+        // Drop one empty-mag / WarZ-map stack onto another. Vanilla isSimilar
+        // often refuses (map id / leftover max-stack), so merge by WarZ identity.
+        if (!event.isShiftClick()
+                && (event.getClick() == ClickType.LEFT || event.getClick() == ClickType.RIGHT)
+                && plugin.items().isShiftMergeCandidate(cursor)
+                && plugin.items().isShiftMergeCandidate(current)
+                && plugin.items().canStackTogether(cursor, current)) {
+            int max = plugin.items().stackLimit(current);
+            int space = max - current.getAmount();
+            if (space > 0) {
+                event.setCancelled(true);
+                int take = event.getClick() == ClickType.RIGHT
+                        ? Math.min(1, Math.min(space, cursor.getAmount()))
+                        : Math.min(space, cursor.getAmount());
+                current.setAmount(current.getAmount() + take);
+                plugin.items().applyMaxStack(current, max);
+                event.setCurrentItem(current);
+                cursor.setAmount(cursor.getAmount() - take);
+                player.setItemOnCursor(cursor.getAmount() <= 0 ? null : cursor);
+                player.updateInventory();
+                return;
+            }
+        }
 
         // Shift-click loose rounds → fill matching mags in the player's inventory.
         if (event.isShiftClick()
@@ -241,6 +304,25 @@ public final class MagazineListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onMergePickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        Item entity = event.getItem();
+        ItemStack incoming = entity.getItemStack();
+        if (!plugin.items().isShiftMergeCandidate(incoming)) {
+            return;
+        }
+        event.setCancelled(true);
+        entity.remove();
+        ItemStack leftover = plugin.items().addItemMerging(player.getInventory(), incoming);
+        if (leftover != null && leftover.getAmount() > 0) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.2f, 1.0f);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHotbarSwap(PlayerItemHeldEvent event) {
         Player player = event.getPlayer();
@@ -358,8 +440,34 @@ public final class MagazineListener implements Listener {
         ItemStack[] contents = inv.getContents();
         for (int i = 0; i < contents.length; i++) {
             ItemStack it = contents[i];
+            if (it == null || it.getType().isAir()) {
+                continue;
+            }
+            if (plugin.items().isGunItem(it)) {
+                plugin.items().applyMaxStack(it, 1);
+                if (it.getAmount() > 1) {
+                    int extra = it.getAmount() - 1;
+                    it.setAmount(1);
+                    inv.setItem(i, it);
+                    for (int n = 0; n < extra; n++) {
+                        ItemStack one = it.clone();
+                        one.setAmount(1);
+                        extras.add(one);
+                    }
+                } else {
+                    inv.setItem(i, it);
+                }
+                continue;
+            }
             if (!plugin.items().isMagazine(it)) {
                 continue;
+            }
+            if (plugin.items().magazineCount(it) <= 0) {
+                var type = plugin.items().magazineType(it);
+                if (type != null) {
+                    inv.setItem(i, plugin.items().createMagazine(type, 0, null, it.getAmount()));
+                    continue;
+                }
             }
             extras.addAll(plugin.items().applyMagazineStackRules(it));
             inv.setItem(i, it);

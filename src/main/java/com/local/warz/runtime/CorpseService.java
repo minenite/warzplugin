@@ -608,6 +608,10 @@ public final class CorpseService implements Listener {
         }
     }
 
+    public boolean isCorpseInventory(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof Holder;
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof Holder holder)) {
@@ -622,6 +626,27 @@ public final class CorpseService implements Listener {
             player.closeInventory();
             player.sendMessage(Component.text("Too far to loot.", NamedTextColor.GRAY));
             return;
+        }
+        if (event.isShiftClick() && event.getWhoClicked() instanceof Player player) {
+            ItemStack current = event.getCurrentItem();
+            if (current != null && !current.getType().isAir()) {
+                event.setCancelled(true);
+                ItemStack moving = current.clone();
+                ItemFactory items = plugin.items();
+                if (items.roundOf(moving).isPresent() && !items.isMagazine(moving)
+                        && event.getClickedInventory() != null
+                        && event.getClickedInventory().getHolder() instanceof Holder) {
+                    items.fillMatchingMagsFrom(player, moving);
+                }
+                ItemStack leftover;
+                if (event.getClickedInventory() instanceof PlayerInventory) {
+                    leftover = items.addItemMerging(corpse.inventory, moving, 0, LOOT_END);
+                } else {
+                    leftover = items.addItemMerging(player.getInventory(), moving);
+                }
+                event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
+                player.updateInventory();
+            }
         }
         scheduleEquipSync(holder.corpseId);
     }

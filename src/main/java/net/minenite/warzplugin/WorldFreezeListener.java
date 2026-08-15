@@ -5,7 +5,10 @@ import org.bukkit.entity.FallingBlock;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.Material;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockFadeEvent;
+import org.bukkit.event.block.BlockFertilizeEvent;
 import org.bukkit.event.block.BlockFormEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockGrowEvent;
@@ -13,6 +16,7 @@ import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.MoistureChangeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.world.StructureGrowEvent;
@@ -108,15 +112,44 @@ public final class WorldFreezeListener implements Listener {
         }
     }
 
-    private static boolean isFrozenPlant(org.bukkit.Material type) {
+    private static boolean isFrozenPlant(Material type) {
         if (type == null) {
             return false;
         }
         String name = type.name();
         return name.endsWith("_SAPLING")
                 || name.equals("MANGROVE_PROPAGULE")
-                || name.endsWith("_FUNGUS")
-                || name.equals("BAMBOO_SAPLING");
+                || name.equals("BAMBOO_SAPLING")
+                || name.equals("AZALEA")
+                || name.equals("FLOWERING_AZALEA")
+                || name.endsWith("_FUNGUS");
+    }
+
+    /** Bone meal must never grow a sapling / azalea / fungus / propagule. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBoneMealClick(PlayerInteractEvent event) {
+        if (!enabled || !growth) {
+            return;
+        }
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
+            return;
+        }
+        if (event.getItem() == null || event.getItem().getType() != Material.BONE_MEAL) {
+            return;
+        }
+        if (isFrozenPlant(event.getClickedBlock().getType())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFertilize(BlockFertilizeEvent event) {
+        if (!enabled || !growth) {
+            return;
+        }
+        if (isFrozenPlant(event.getBlock().getType())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

@@ -27,6 +27,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.server.MapInitializeEvent;
@@ -205,9 +206,11 @@ public final class WorldMapService implements Listener {
                     ChatColor.RED + "●" + ChatColor.GRAY + " you  "
                             + ChatColor.GREEN + "●" + ChatColor.GRAY + " friends"));
             stack.setItemMeta(meta);
-            // A filled map is one per slot in vanilla; these are all the same map,
-            // so there is no reason to carry them one at a time.
-            com.local.warz.runtime.ItemFactory.applyMaxStack(stack, 64);
+            if (plugin.items() != null) {
+                plugin.items().markWarzMap(stack);
+            } else {
+                com.local.warz.runtime.ItemFactory.applyMaxStack(stack, 64);
+            }
             return stack;
         } catch (Throwable t) {
             plugin.getLogger().severe("Failed to create world map: " + t.getMessage());
@@ -411,13 +414,66 @@ public final class WorldMapService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> rewriteInventoryMaps(player));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
         Bukkit.getScheduler().runTask(plugin, () -> {
-            attachItem(player.getInventory().getItemInMainHand());
-            attachItem(player.getInventory().getItemInOffHand());
-            for (ItemStack stack : player.getInventory().getContents()) {
-                attachItem(stack);
-            }
+            rewriteInventoryMaps(player);
+            rewriteContents(event.getInventory(), player);
         });
+    }
+
+    /** Bind every filled map to the shared overview so they can stack. */
+    public void rewriteInventoryMaps(Player player) {
+        if (!loaded || player == null) {
+            return;
+        }
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack stack = contents[i];
+            if (stack == null || stack.getType() != Material.FILLED_MAP) {
+                continue;
+            }
+            ItemStack fresh = createMapItem(player);
+            if (fresh == null) {
+                attachItem(stack);
+                continue;
+            }
+            fresh.setAmount(Math.min(64, Math.max(1, stack.getAmount())));
+            if (plugin.items() != null) {
+                plugin.items().markWarzMap(fresh);
+            }
+            player.getInventory().setItem(i, fresh);
+        }
+    }
+
+    /** Bind filled maps in any open inventory to the shared stackable overview. */
+    public void rewriteContents(org.bukkit.inventory.Inventory inv, Player viewer) {
+        if (!loaded || inv == null || viewer == null) {
+            return;
+        }
+        ItemStack[] contents = inv.getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack stack = contents[i];
+            if (stack == null || stack.getType() != Material.FILLED_MAP) {
+                continue;
+            }
+            ItemStack fresh = createMapItem(viewer);
+            if (fresh == null) {
+                attachItem(stack);
+                continue;
+            }
+            fresh.setAmount(Math.min(64, Math.max(1, stack.getAmount())));
+            if (plugin.items() != null) {
+                plugin.items().markWarzMap(fresh);
+            }
+            inv.setItem(i, fresh);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
