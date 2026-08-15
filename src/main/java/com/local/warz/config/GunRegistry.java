@@ -173,7 +173,7 @@ public final class GunRegistry {
         Path out = plugin.getDataFolder().toPath().resolve("custom-model-data.txt");
         List<String> lines = new ArrayList<>();
         lines.add("# CustomModelData ↔ gun id ↔ resource-pack model (bone item)");
-        lines.add("# Base material: " + plugin.getConfig().getString("gun-base-material", "BONE"));
+        lines.add("# Base material: " + plugin.getConfig().getString("gun-base-material", "STICK"));
         lines.add("# Pack: enable WarZ-guns in Options → Resource Packs");
         byFile.values().stream()
                 .sorted(Comparator.comparing(GunDefinition::fileName))

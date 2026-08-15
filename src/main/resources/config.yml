@@ -100,8 +100,16 @@ death-spawn-look-range: 96
 #     pitch: 0
 
 # Guns / attachments / ammo are all STICK items with CustomModelData (MineniteWARZ pack).
+# The pack dispatches the gun models on both stick and bone, so either works;
+# the old server ran BONE.
 gun-base-material: STICK
 seed-defaults: true
+
+# Ticks to block firing after swapping weapons. 0 is the old server's value.
+gunswapcooldown: 0
+# Laser module particle size. Read by Bullet; it was never in this file, so the
+# only way to find the key was to read the source.
+laser-particle-size: 1.25
 companion:
   features:
     leaves: true
