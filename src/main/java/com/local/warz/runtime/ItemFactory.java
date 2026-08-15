@@ -3356,6 +3356,7 @@ public final class ItemFactory {
         ItemStack stack = new ItemStack(Material.FIREWORK_STAR, n);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(roundKey, PersistentDataType.STRING, "flare_cartridge");
+        applyCmd(meta, CMD_FLARE_CARTRIDGE);
         meta.displayName(colorize("&6Flare Cartridge"));
         meta.lore(List.of(
                 colorize("&8flare_cartridge"),
@@ -3493,6 +3494,8 @@ public final class ItemFactory {
     }
 
     /** Custom model data range for operator UAV hotbar icons (companion item models). */
+    /** Flare cartridge. The art has been in the pack all along, unreferenced. */
+    public static final int CMD_FLARE_CARTRIDGE = 2601;
     public static final int CMD_DRONE_FIRE = 4101;
     public static final int CMD_DRONE_ORBIT = 4102;
     public static final int CMD_DRONE_CONTROL = 4103;
