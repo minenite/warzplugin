@@ -2534,6 +2534,7 @@ public final class ItemFactory {
         meta.getPersistentDataContainer().set(grappleKey, PersistentDataType.BYTE, (byte) 1);
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES);
+        applyCmd(meta, CMD_GRAPPLING_HOOK);
         stack.setItemMeta(meta);
         return stack;
     }
@@ -2544,6 +2545,7 @@ public final class ItemFactory {
         ItemMeta meta = copy.getItemMeta();
         meta.getPersistentDataContainer().set(grappleKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(grappleUsesKey, PersistentDataType.INTEGER, uses);
+        applyCmd(meta, CMD_GRAPPLING_HOOK);
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES);
         meta.displayName(colorize("&2Grappling Hook &7(" + uses + "/" + GrappleService.MAX_USES + ")"));
@@ -2576,6 +2578,7 @@ public final class ItemFactory {
         ItemStack stack = new ItemStack(Material.IRON_BARS, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(trapKey, PersistentDataType.STRING, TRAP_CHAINLINK);
+        applyCmd(meta, CMD_CHAINLINK);
         meta.displayName(colorize("&7Chainlink"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Climbable fence panels."));
@@ -2596,6 +2599,7 @@ public final class ItemFactory {
         ItemStack stack = new ItemStack(Material.COBWEB, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(trapKey, PersistentDataType.STRING, TRAP_RAZOR_WIRE);
+        applyCmd(meta, CMD_RAZOR_WIRE);
         meta.displayName(colorize("&8Razor Wire"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Slows and damages players."));
@@ -2623,6 +2627,7 @@ public final class ItemFactory {
         ItemStack stack = new ItemStack(Material.SHEARS, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(toolKey, PersistentDataType.STRING, TOOL_WIRE_CUTTERS);
+        applyCmd(meta, CMD_WIRE_CUTTERS);
         meta.displayName(colorize("&fWire Cutters"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Cut and reclaim razor wire"));
@@ -2812,6 +2817,7 @@ public final class ItemFactory {
         LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
         meta.setColor(SCUBA_MASK_COLOR);
         meta.getPersistentDataContainer().set(scubaKey, PersistentDataType.STRING, SCUBA_HELMET);
+        applyCmd(meta, CMD_SCUBA_HELMET);
         meta.displayName(colorize("&bScuba Helmet"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Dive mask — wear on head"));
@@ -2827,6 +2833,7 @@ public final class ItemFactory {
         LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
         meta.setColor(SCUBA_TANK_COLOR);
         meta.getPersistentDataContainer().set(scubaKey, PersistentDataType.STRING, SCUBA_TANK);
+        applyCmd(meta, CMD_SCUBA_TANK);
         meta.displayName(colorize("&8Scuba Tank"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Air tank — wear on torso"));
@@ -2842,6 +2849,7 @@ public final class ItemFactory {
         LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
         meta.setColor(WETSUIT_COLOR);
         meta.getPersistentDataContainer().set(scubaKey, PersistentDataType.STRING, WETSUIT_LEGS);
+        applyCmd(meta, CMD_WETSUIT_LEGS);
         meta.displayName(colorize("&3Wetsuit Leggings"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Insulated wetsuit bottoms"));
@@ -2857,6 +2865,7 @@ public final class ItemFactory {
         LeatherArmorMeta meta = (LeatherArmorMeta) stack.getItemMeta();
         meta.setColor(WETSUIT_COLOR);
         meta.getPersistentDataContainer().set(scubaKey, PersistentDataType.STRING, WETSUIT_BOOTS);
+        applyCmd(meta, CMD_WETSUIT_BOOTS);
         meta.displayName(colorize("&3Wetsuit Boots"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&7Insulated wetsuit footwear"));
@@ -3503,6 +3512,19 @@ public final class ItemFactory {
     public static final int CMD_FLARE_CARTRIDGE = 2601;
     /** Scrap metal. Had no model at all - it showed as a plain iron ingot. */
     public static final int CMD_METAL = 4350;
+    /**
+     * Gear that had no model of its own and showed as the raw vanilla item:
+     * dyed leather for the dive kit, a fishing rod, iron bars, a cobweb and
+     * shears.
+     */
+    public static final int CMD_SCUBA_HELMET = 4360;
+    public static final int CMD_SCUBA_TANK = 4361;
+    public static final int CMD_WETSUIT_LEGS = 4362;
+    public static final int CMD_WETSUIT_BOOTS = 4363;
+    public static final int CMD_GRAPPLING_HOOK = 4364;
+    public static final int CMD_CHAINLINK = 4365;
+    public static final int CMD_RAZOR_WIRE = 4366;
+    public static final int CMD_WIRE_CUTTERS = 4367;
     public static final int CMD_DRONE_FIRE = 4101;
     public static final int CMD_DRONE_ORBIT = 4102;
     public static final int CMD_DRONE_CONTROL = 4103;
