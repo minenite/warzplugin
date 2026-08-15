@@ -641,7 +641,11 @@ public final class GiveGunMenuService {
         wetsuitBoots.setItemMeta(wetsuitBootsMeta);
         inv.setItem(26, wetsuitBoots);
 
-        inv.setItem(10, button(Material.ORANGE_DYE, "&6Hazmat Suit",
+        // Slot 38, not 10: slot 10 is the NVG helmet. This button used to be drawn
+        // over it, which hid the helmet and - because the click handler checks
+        // slot 10 for the helmet first - made this button hand out an NVG helmet
+        // and never open the hazmat page at all.
+        inv.setItem(38, button(Material.ORANGE_DYE, "&6Hazmat Suit",
                 "&7Orange chemical oversuit",
                 "&aBlocks X-37B hydrazine vapor",
                 "&eClick to browse / equip"));
@@ -1271,7 +1275,7 @@ public final class GiveGunMenuService {
                 giveOrEquipArmor(player, plugin.items().createWetsuitLeggings(), left, right, ArmorSlot.LEGS);
             } else if (slot == 26) {
                 giveOrEquipArmor(player, plugin.items().createWetsuitBoots(), left, right, ArmorSlot.BOOTS);
-            } else if (slot == 10) {
+            } else if (slot == 38) {
                 session.page = Page.HAZMAT_SUIT;
                 render(player);
             } else if (slot == 13) {

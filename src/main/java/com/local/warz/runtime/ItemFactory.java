@@ -95,6 +95,7 @@ public final class ItemFactory {
     private final NamespacedKey gripKey;
     private final NamespacedKey zeroYardsKey;
     private final NamespacedKey gunConditionKey;
+    private final NamespacedKey warzMapKey;
     private final Material baseMaterial;
 
     /** Separator for {@code tooltip_detail} PDC (avoids raw newlines in NBT). */
@@ -149,6 +150,14 @@ public final class ItemFactory {
     /** Inventory dye — matches hazmat skin ochre (worn look uses equipment texture). */
     private static final Color HAZMAT_COLOR = Color.fromRGB(0xD9, 0x9A, 0x28);
     private static final Color FIRE_SUIT_COLOR = Color.fromRGB(0xBE, 0xC3, 0xCD);
+    /**
+     * Hazmat inventory icons. These were dyed leather with no CMD, so the icon was
+     * an orange leather helmet rather than the hazmat model the pack ships.
+     */
+    public static final int CMD_HAZMAT_HELMET = 4300;
+    public static final int CMD_HAZMAT_CHEST = 4301;
+    public static final int CMD_HAZMAT_LEGS = 4302;
+    public static final int CMD_HAZMAT_BOOTS = 4303;
     /** NiftyBlocks fire suit inventory icons (leather CMD → companion models). */
     public static final int CMD_FIRE_HELMET = 4310;
     public static final int CMD_FIRE_CHEST = 4311;
@@ -216,6 +225,7 @@ public final class ItemFactory {
         this.gripKey = WarzKeys.of("grip");
         this.zeroYardsKey = WarzKeys.of("zero_yards");
         this.gunConditionKey = WarzKeys.of("gun_condition");
+        this.warzMapKey = WarzKeys.of("warz_map");
         Material configured = Material.matchMaterial(
                 plugin.getConfig().getString("gun-base-material", "STICK")
         );
@@ -341,7 +351,8 @@ public final class ItemFactory {
     }
 
     public ItemStack create(GunDefinition def, int amount) {
-        ItemStack stack = new ItemStack(baseMaterial, Math.max(1, amount));
+        // Guns never stack: each one has its own attachments, chamber and wear.
+        ItemStack stack = new ItemStack(baseMaterial, 1);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(gunKey, PersistentDataType.STRING, def.fileName());
         meta.getPersistentDataContainer().set(modelKey, PersistentDataType.INTEGER, def.customModelData());
@@ -349,10 +360,8 @@ public final class ItemFactory {
         meta.displayName(colorize(def.displayName()));
         stack.setItemMeta(meta);
         applyGunInventoryLore(stack, false);
-        // A gun carries its own state - fitted attachments, what is chambered, its
-        // wear - so two of them are never the same item. Stacking would merge
-        // those into one.
         applyMaxStack(stack, 1);
+        stack.setAmount(1);
         return stack;
     }
 
@@ -1275,6 +1284,13 @@ public final class ItemFactory {
     public static final int CMD_FLASHLIGHT = 3140;
     public static final int CMD_PEQ15 = 3141;
     public static final int CMD_MAG_ADAPTER = 3142;
+    /**
+     * Handheld gear on the stick base. Both of these shipped with no CMD at all,
+     * so the tactical flashlight and the radiolink were literally sticks in the
+     * hand and in the gear menu.
+     */
+    public static final int CMD_FLASHLIGHT_HANDHELD = 3143;
+    public static final int CMD_RADIOLINK = 3144;
 
     /** Workbench craft part — weapon light module. */
     public ItemStack createFlashlightModulePart() {
@@ -1284,7 +1300,7 @@ public final class ItemFactory {
         applyCmd(meta, CMD_FLASHLIGHT);
         meta.displayName(colorize("&eFlashlight Module"));
         List<Component> compact = new ArrayList<>();
-        compact.add(colorize("&7Weapon light — real LIGHT blocks"));
+        compact.add(colorize("&7Weapon light — look-direction beam"));
         compact.add(colorize("&eZ &7to toggle on a fitted gun"));
         List<Component> detail = new ArrayList<>(compact);
         detail.addAll(lightMechanicLines(PeqMode.FLASH));
@@ -2872,7 +2888,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatHelmet() {
         return createSuitPiece(Material.LEATHER_HELMET, HAZMAT_COLOR, SUIT_HAZMAT_HELMET,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.HEAD,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.HEAD, CMD_HAZMAT_HELMET,
                 "&6Hazmat Helmet",
                 "&7Sealed orange respirator hood",
                 "&aBlocks hydrazine vapor (with suit)");
@@ -2880,7 +2896,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatChestplate() {
         return createSuitPiece(Material.LEATHER_CHESTPLATE, HAZMAT_COLOR, SUIT_HAZMAT_CHEST,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.CHEST,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.CHEST, CMD_HAZMAT_CHEST,
                 "&6Hazmat Suit",
                 "&7Level-A orange chemical oversuit",
                 "&aImmune to X-37B hydrazine leak while worn");
@@ -2888,7 +2904,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatLeggings() {
         return createSuitPiece(Material.LEATHER_LEGGINGS, HAZMAT_COLOR, SUIT_HAZMAT_LEGS,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.LEGS,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.LEGS, CMD_HAZMAT_LEGS,
                 "&6Hazmat Leggings",
                 "&7Chemical-resistant trousers",
                 "&7Part of the hazmat ensemble");
@@ -2896,7 +2912,7 @@ public final class ItemFactory {
 
     public ItemStack createHazmatBoots() {
         return createSuitPiece(Material.LEATHER_BOOTS, HAZMAT_COLOR, SUIT_HAZMAT_BOOTS,
-                "hazmat", org.bukkit.inventory.EquipmentSlot.FEET,
+                "hazmat", org.bukkit.inventory.EquipmentSlot.FEET, CMD_HAZMAT_BOOTS,
                 "&6Hazmat Boots",
                 "&7Sealed overboots",
                 "&7Part of the hazmat ensemble");
@@ -3003,19 +3019,21 @@ public final class ItemFactory {
         return SUIT_FIRE_CHEST.equals(suitId(player.getInventory().getChestplate()));
     }
 
-    /** Handheld tactical flashlight — places real LIGHT blocks along the look ray. */
+    /** Handheld tactical flashlight — client look-cone, not vanilla LIGHT blocks. */
     public ItemStack createFlashlight() {
         // Stick: no block-place fight on right-click (same idea as the old blaze rod).
         ItemStack stack = new ItemStack(Material.STICK, 1);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(flashlightKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(flashlightOnKey, PersistentDataType.BYTE, (byte) 0);
+        meta.getPersistentDataContainer().set(modelKey, PersistentDataType.INTEGER, CMD_FLASHLIGHT_HANDHELD);
+        applyCmd(meta, CMD_FLASHLIGHT_HANDHELD, "flashlight_handheld");
         meta.displayName(colorize("&eTactical Flashlight &7[OFF]"));
         List<Component> lore = new ArrayList<>();
-        lore.add(colorize("&7Real world light beam (LIGHT blocks)"));
+        lore.add(colorize("&7Look-direction spotlight"));
         lore.add(colorize("&eRight-click &7→ toggle ON / OFF"));
         lore.add(colorize("&7Hold in main hand or offhand while ON"));
-        lore.add(colorize("&8Works in caves / night / interiors"));
+        lore.add(colorize("&8Lights whatever you aim at"));
         meta.lore(lore);
         stack.setItemMeta(meta);
         return stack;
@@ -3023,6 +3041,46 @@ public final class ItemFactory {
 
     public boolean isFlashlight(ItemStack stack) {
         return readFlag(stack, flashlightKey);
+    }
+
+    public boolean isWarzMap(ItemStack stack) {
+        if (stack == null || stack.getType() != Material.FILLED_MAP) {
+            return false;
+        }
+        if (readFlag(stack, warzMapKey)) {
+            return true;
+        }
+        if (!stack.hasItemMeta()) {
+            return false;
+        }
+        var name = stack.getItemMeta().displayName();
+        if (name == null) {
+            return false;
+        }
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(name);
+        return plain.toLowerCase(Locale.ROOT).contains("warz map");
+    }
+
+    public void markWarzMap(ItemStack stack) {
+        if (stack == null || stack.getType() != Material.FILLED_MAP || !stack.hasItemMeta()) {
+            return;
+        }
+        ItemMeta meta = stack.getItemMeta();
+        meta.getPersistentDataContainer().set(warzMapKey, PersistentDataType.BYTE, (byte) 1);
+        stack.setItemMeta(meta);
+        applyMaxStack(stack, 64);
+    }
+
+    /** Empty mags and WarZ maps — shift-click should merge these everywhere. */
+    public boolean isShiftMergeCandidate(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            return false;
+        }
+        if (isWarzMap(stack)) {
+            return true;
+        }
+        return isMagazine(stack) && magazineCount(stack) <= 0;
     }
 
     public boolean isFlashlightOn(ItemStack stack) {
@@ -3418,6 +3476,8 @@ public final class ItemFactory {
         ItemStack stack = new ItemStack(Material.STICK, 1);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(radiolinkKey, PersistentDataType.BYTE, (byte) 1);
+        meta.getPersistentDataContainer().set(modelKey, PersistentDataType.INTEGER, CMD_RADIOLINK);
+        applyCmd(meta, CMD_RADIOLINK, "radiolink");
         meta.displayName(colorize("&dRadiolink"));
         List<Component> lore = new ArrayList<>();
         lore.add(colorize("&8radiolink"));
@@ -4036,7 +4096,7 @@ public final class ItemFactory {
         if (magazineCount(a) > 0 || magazineCount(b) > 0) {
             return false;
         }
-        return a.getAmount() + b.getAmount() <= 64;
+        return true;
     }
 
     /** Merge empty mag stacks only. */
@@ -4112,6 +4172,182 @@ public final class ItemFactory {
         return take;
     }
 
+    /**
+     * Whether two stacks should merge in inventory / corpse loot.
+     * Vanilla {@code isSimilar} fails when one copy has a leftover max-stack
+     * component or lore drift — the usual corpse shift-click miss.
+     * Guns and loaded magazines never merge.
+     */
+    public boolean canStackTogether(ItemStack a, ItemStack b) {
+        if (a == null || b == null || a.getType().isAir() || b.getType().isAir()) {
+            return false;
+        }
+        if (isGunItem(a) || isGunItem(b)) {
+            return false;
+        }
+        if (isMagazine(a) || isMagazine(b)) {
+            return magazinesCanMerge(a, b);
+        }
+        if (isWarzMap(a) || isWarzMap(b)) {
+            return isWarzMap(a) && isWarzMap(b);
+        }
+        if (isLifeStraw(a) || isLifeStraw(b) || isGrapplingHook(a) || isGrapplingHook(b)
+                || isBigDroneItem(a) || isBigDroneItem(b)
+                || NvgGear.isNvgHelmet(plugin, a) || NvgGear.isNvgHelmet(plugin, b)
+                || ThermalGear.isThermalHelmet(plugin, a) || ThermalGear.isThermalHelmet(plugin, b)) {
+            return false;
+        }
+        Optional<String> ra = roundId(a);
+        Optional<String> rb = roundId(b);
+        if (ra.isPresent() || rb.isPresent()) {
+            return ra.isPresent() && ra.equals(rb);
+        }
+        String fa = foodId(a);
+        String fb = foodId(b);
+        if (fa != null || fb != null) {
+            return fa != null && fa.equals(fb);
+        }
+        String da = drinkId(a);
+        String db = drinkId(b);
+        if (da != null || db != null) {
+            return da != null && da.equals(db);
+        }
+        String ma = medicalId(a);
+        String mb = medicalId(b);
+        if (ma != null || mb != null) {
+            return ma != null && ma.equals(mb);
+        }
+        String pa = attachmentPartId(a);
+        String pb = attachmentPartId(b);
+        if (pa != null || pb != null) {
+            return pa != null && pa.equals(pb);
+        }
+        if (isEmptyCan(a) || isEmptyCan(b)) {
+            return isEmptyCan(a) && isEmptyCan(b);
+        }
+        if (isEmptyGlassBottle(a) || isEmptyGlassBottle(b)) {
+            return isEmptyGlassBottle(a) && isEmptyGlassBottle(b);
+        }
+        if (isPlasticBottle(a) || isPlasticBottle(b)) {
+            return isPlasticBottle(a) && isPlasticBottle(b);
+        }
+        if (isBrokenGlassBottle(a) || isBrokenGlassBottle(b)) {
+            return isBrokenGlassBottle(a) && isBrokenGlassBottle(b);
+        }
+        if (isChainlink(a) || isChainlink(b)) {
+            return isChainlink(a) && isChainlink(b);
+        }
+        if (isRazorWire(a) || isRazorWire(b)) {
+            return isRazorWire(a) && isRazorWire(b);
+        }
+        if (isMetal(a) || isMetal(b)) {
+            return isMetal(a) && isMetal(b);
+        }
+        if (isJetFuelCan(a) || isJetFuelCan(b)) {
+            return isJetFuelCan(a) && isJetFuelCan(b);
+        }
+        if (isHydrazineFuelCan(a) || isHydrazineFuelCan(b)) {
+            return isHydrazineFuelCan(a) && isHydrazineFuelCan(b);
+        }
+        SmokeType sa = smokeType(a);
+        SmokeType sb = smokeType(b);
+        if (sa != null || sb != null) {
+            return sa != null && sa == sb;
+        }
+        if (isRoadFlare(a) || isRoadFlare(b)) {
+            return isRoadFlare(a) && isRoadFlare(b) && flareColor(a) != null
+                    && flareColor(a).equals(flareColor(b));
+        }
+        return a.isSimilar(b);
+    }
+
+    /** Max amount this stack is allowed to hold. Guns and loaded mags are always 1. */
+    public int stackLimit(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            return 1;
+        }
+        if (isGunItem(stack)) {
+            return 1;
+        }
+        if (isMagazine(stack) && magazineCount(stack) > 0) {
+            return 1;
+        }
+        Optional<RoundDefinition> round = roundOf(stack);
+        if (round.isPresent() && !isMagazine(stack) && round.get().explodeRadiusAdd() > 0) {
+            return HE_LOOSE_STACK_MAX;
+        }
+        if (isMetal(stack)) {
+            return METAL_STACK_MAX;
+        }
+        if (medicalId(stack) != null) {
+            return MEDICAL_STACK_MAX;
+        }
+        if (isFood(stack) || isEmptyCan(stack) || isDrink(stack)) {
+            return EMPTY_CAN_STACK_MAX;
+        }
+        if (isWarzMap(stack) || (isMagazine(stack) && magazineCount(stack) <= 0)) {
+            return 64;
+        }
+        int marked = stack.getMaxStackSize();
+        return marked > 0 ? marked : 64;
+    }
+
+    /**
+     * Put {@code incoming} into {@code inv}, merging WarZ-identical stacks first.
+     * @return leftover that did not fit, or null
+     */
+    public ItemStack addItemMerging(org.bukkit.inventory.Inventory inv, ItemStack incoming) {
+        if (inv == null) {
+            return incoming;
+        }
+        int end = inv.getSize();
+        if (inv instanceof PlayerInventory) {
+            end = 36;
+        }
+        return addItemMerging(inv, incoming, 0, end);
+    }
+
+    public ItemStack addItemMerging(org.bukkit.inventory.Inventory inv, ItemStack incoming,
+                                    int fromSlot, int toSlotExclusive) {
+        if (inv == null || incoming == null || incoming.getType().isAir() || incoming.getAmount() <= 0) {
+            return null;
+        }
+        ItemStack moving = incoming.clone();
+        int last = Math.min(toSlotExclusive, inv.getSize());
+        int first = Math.max(0, fromSlot);
+        for (int i = first; i < last && moving.getAmount() > 0; i++) {
+            ItemStack slot = inv.getItem(i);
+            if (slot == null || slot.getType().isAir()) {
+                continue;
+            }
+            if (!canStackTogether(slot, moving)) {
+                continue;
+            }
+            int max = Math.min(stackLimit(slot), stackLimit(moving));
+            int space = max - slot.getAmount();
+            if (space <= 0) {
+                continue;
+            }
+            int take = Math.min(space, moving.getAmount());
+            slot.setAmount(slot.getAmount() + take);
+            inv.setItem(i, slot);
+            moving.setAmount(moving.getAmount() - take);
+        }
+        for (int i = first; i < last && moving.getAmount() > 0; i++) {
+            ItemStack slot = inv.getItem(i);
+            if (slot != null && !slot.getType().isAir()) {
+                continue;
+            }
+            int put = Math.min(stackLimit(moving), moving.getAmount());
+            ItemStack place = moving.clone();
+            place.setAmount(put);
+            applyMaxStack(place, stackLimit(place));
+            inv.setItem(i, place);
+            moving.setAmount(moving.getAmount() - put);
+        }
+        return moving.getAmount() <= 0 ? null : moving;
+    }
+
     /** Give leftover item stacks to a player (inventory, else drop). */
     public void giveOrDrop(org.bukkit.entity.Player player, List<ItemStack> items) {
         if (player == null || items == null) {
@@ -4121,9 +4357,9 @@ public final class ItemFactory {
             if (it == null || it.getType().isAir() || it.getAmount() <= 0) {
                 continue;
             }
-            Map<Integer, ItemStack> left = player.getInventory().addItem(it);
-            for (ItemStack drop : left.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), drop);
+            ItemStack left = addItemMerging(player.getInventory(), it);
+            if (left != null && left.getAmount() > 0) {
+                player.getWorld().dropItemNaturally(player.getLocation(), left);
             }
         }
     }
