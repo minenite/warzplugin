@@ -51,32 +51,7 @@ public final class MagazineListener implements Listener {
         ItemStack cursor = event.getCursor();
         ItemStack current = event.getCurrentItem();
         if (event.isShiftClick() && plugin.items().isShiftMergeCandidate(current)) {
-            org.bukkit.inventory.Inventory clicked = event.getClickedInventory();
-            if (clicked instanceof PlayerInventory
-                    && event.getView().getTopInventory() instanceof CraftingInventory) {
-                // Own inventory (E): hotbar ↔ storage. Never dump into the 2x2 craft
-                // grid — that left a ghost in the old slot / offhand.
-                int slot = event.getSlot();
-                if (slot >= 0 && slot < 36) {
-                    event.setCancelled(true);
-                    int from = slot < 9 ? 9 : 0;
-                    int to = slot < 9 ? 36 : 9;
-                    ItemStack leftover = plugin.items().addItemMerging(
-                            player.getInventory(), current.clone(), from, to);
-                    event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
-                    player.updateInventory();
-                }
-                return;
-            }
-            org.bukkit.inventory.Inventory dest = clicked instanceof PlayerInventory
-                    ? event.getView().getTopInventory()
-                    : player.getInventory();
-            if (dest != null && dest != clicked) {
-                event.setCancelled(true);
-                ItemStack moving = current.clone();
-                ItemStack leftover = plugin.items().addItemMerging(dest, moving);
-                event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
-                player.updateInventory();
+            if (shiftMove(player, event, current)) {
                 return;
             }
         }
@@ -124,6 +99,14 @@ public final class MagazineListener implements Listener {
                 }
                 player.sendActionBar(ItemFactory.colorize("&aLoaded &f" + loaded + " &7into mag"));
                 player.updateInventory();
+                return;
+            }
+            // No magazine wanted them, so this is an ordinary shift-click move.
+            // Doing it here rather than leaving it to the server means the rounds
+            // land on the ammo already in the destination instead of taking a new
+            // slot: the move merges by round id, the same rule everything else in
+            // the plugin uses.
+            if (shiftMove(player, event, current)) {
                 return;
             }
         }
@@ -360,6 +343,43 @@ public final class MagazineListener implements Listener {
             preview.setItemMeta(meta);
         }
         event.getInventory().setResult(preview);
+    }
+
+    /**
+     * Shift-click move that merges by WarZ identity instead of vanilla similarity.
+     *
+     * @return true when the move was handled and the event consumed
+     */
+    private boolean shiftMove(Player player, InventoryClickEvent event, ItemStack current) {
+        org.bukkit.inventory.Inventory clicked = event.getClickedInventory();
+        if (clicked instanceof PlayerInventory
+                && event.getView().getTopInventory() instanceof CraftingInventory) {
+            // Own inventory (E): hotbar ↔ storage. Never dump into the 2x2 craft
+            // grid — that left a ghost in the old slot / offhand.
+            int slot = event.getSlot();
+            if (slot < 0 || slot >= 36) {
+                return false;
+            }
+            event.setCancelled(true);
+            int from = slot < 9 ? 9 : 0;
+            int to = slot < 9 ? 36 : 9;
+            ItemStack leftover = plugin.items().addItemMerging(
+                    player.getInventory(), current.clone(), from, to);
+            event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
+            player.updateInventory();
+            return true;
+        }
+        org.bukkit.inventory.Inventory dest = clicked instanceof PlayerInventory
+                ? event.getView().getTopInventory()
+                : player.getInventory();
+        if (dest == null || dest == clicked) {
+            return false;
+        }
+        event.setCancelled(true);
+        ItemStack leftover = plugin.items().addItemMerging(dest, current.clone());
+        event.setCurrentItem(leftover == null || leftover.getAmount() <= 0 ? null : leftover);
+        player.updateInventory();
+        return true;
     }
 
     /**
