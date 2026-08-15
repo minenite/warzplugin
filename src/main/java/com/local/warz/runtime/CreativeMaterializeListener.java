@@ -84,7 +84,7 @@ public final class CreativeMaterializeListener implements Listener, PluginMessag
             if (slot >= 0 && slot < inv.getSize()) {
                 inv.setItem(slot, full);
             } else {
-                player.getInventory().addItem(full);
+                plugin.items().giveOrDrop(player, full);
             }
         }
         player.updateInventory();

@@ -4571,10 +4571,15 @@ public final class ItemFactory {
                 continue;
             }
             int before = ammo.getAmount();
-            var left = inv.addItem(ammo);
-            int failed = left.values().stream().mapToInt(ItemStack::getAmount).sum();
+            // Unloaded rounds have to land on the ammo already in the pocket.
+            // Inventory#addItem merges on vanilla similarity, so a round whose
+            // lore or max-stack component had drifted opened a new slot instead.
+            ItemStack leftStack = addItemMerging(inv, ammo);
+            int failed = leftStack == null ? 0 : leftStack.getAmount();
+            java.util.List<ItemStack> left = leftStack == null || leftStack.getAmount() <= 0
+                    ? java.util.List.of() : java.util.List.of(leftStack);
             unloaded += before - failed;
-            for (ItemStack fail : left.values()) {
+            for (ItemStack fail : left) {
                 Optional<RoundDefinition> fr = roundOf(fail);
                 if (fr.isEmpty()) {
                     continue;
@@ -4645,10 +4650,15 @@ public final class ItemFactory {
             }
             ItemStack ammo = createRound(round.get(), e.getValue());
             int before = ammo.getAmount();
-            var left = inv.addItem(ammo);
-            int failed = left.values().stream().mapToInt(ItemStack::getAmount).sum();
+            // Unloaded rounds have to land on the ammo already in the pocket.
+            // Inventory#addItem merges on vanilla similarity, so a round whose
+            // lore or max-stack component had drifted opened a new slot instead.
+            ItemStack leftStack = addItemMerging(inv, ammo);
+            int failed = leftStack == null ? 0 : leftStack.getAmount();
+            java.util.List<ItemStack> left = leftStack == null || leftStack.getAmount() <= 0
+                    ? java.util.List.of() : java.util.List.of(leftStack);
             unloaded += before - failed;
-            for (ItemStack fail : left.values()) {
+            for (ItemStack fail : left) {
                 Optional<RoundDefinition> fr = roundOf(fail);
                 if (fr.isEmpty()) {
                     continue;
@@ -4693,8 +4703,8 @@ public final class ItemFactory {
             return 0;
         }
         ItemStack ammo = createRound(round.get(), removed);
-        var left = inv.addItem(ammo);
-        int failed = left.values().stream().mapToInt(ItemStack::getAmount).sum();
+        ItemStack leftStack = addItemMerging(inv, ammo);
+        int failed = leftStack == null ? 0 : leftStack.getAmount();
         if (failed > 0) {
             List<String> back = magazineLoadList(mag);
             for (int i = 0; i < failed; i++) {

@@ -530,8 +530,7 @@ public final class GunsCommand implements CommandExecutor, TabCompleter {
         }
         final Player recipient = target;
         ItemStack ammo = plugin.items().createRound(roundOpt.get(), amount);
-        recipient.getInventory().addItem(ammo).values().forEach(left ->
-                recipient.getWorld().dropItemNaturally(recipient.getLocation(), left));
+        plugin.items().giveOrDrop(recipient, ammo);
         sender.sendMessage(Component.text("Gave " + amount + "x " + roundOpt.get().fileName()
                 + " to " + recipient.getName(), NamedTextColor.GREEN));
         return true;

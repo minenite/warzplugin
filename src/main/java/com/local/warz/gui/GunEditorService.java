@@ -984,7 +984,7 @@ public final class GunEditorService {
         if (slot == 12) {
             String id = AmmoCaliber.primaryRound(d.ammoCaliber);
             plugin.rounds().get(id).ifPresent(round -> {
-                player.getInventory().addItem(plugin.items().createRound(round, 64));
+                plugin.items().giveOrDrop(player, plugin.items().createRound(round, 64));
                 player.sendMessage(Component.text("Gave 64x " + round.fileName(), NamedTextColor.GREEN));
             });
             return;
@@ -995,7 +995,7 @@ public final class GunEditorService {
                     : d.allowedRounds;
             for (String id : ids) {
                 plugin.rounds().get(id).ifPresent(round ->
-                        player.getInventory().addItem(plugin.items().createRound(round, 16)));
+                        plugin.items().giveOrDrop(player, plugin.items().createRound(round, 16)));
             }
             player.sendMessage(Component.text("Gave allowed rounds.", NamedTextColor.GREEN));
             return;
@@ -1141,7 +1141,7 @@ public final class GunEditorService {
             return;
         }
         if (slot == 40) {
-            player.getInventory().addItem(plugin.items().createRound(r.toDefinition(), 64));
+            plugin.items().giveOrDrop(player, plugin.items().createRound(r.toDefinition(), 64));
             player.sendMessage(Component.text("Gave 64x " + r.fileName, NamedTextColor.GREEN));
             return;
         }
