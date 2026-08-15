@@ -457,8 +457,7 @@ public final class WaterService implements Listener {
     private void fillVessel(Player player, ItemStack hand, DrinkType filled) {
         consumeOne(player, hand);
         ItemStack out = plugin.items().createDrink(filled, 1);
-        var left = player.getInventory().addItem(out);
-        left.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
+        plugin.items().giveOrDrop(player, out);
         player.playSound(player.getLocation(), Sound.ITEM_BOTTLE_FILL, 1f, 1f);
         player.sendMessage(ItemFactory.colorize("&7Filled with &eunfiltered water&7. Boil on a &6campfire&7."));
     }

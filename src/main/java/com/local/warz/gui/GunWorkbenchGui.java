@@ -544,9 +544,8 @@ public final class GunWorkbenchGui {
         inv.setItem(SLOT_RESULT, null);
     }
 
-    private static void give(Player player, ItemStack stack) {
-        player.getInventory().addItem(stack).values().forEach(left ->
-                player.getWorld().dropItemNaturally(player.getLocation(), left));
+    private void give(Player player, ItemStack stack) {
+        plugin.items().giveOrDrop(player, stack);
     }
 
     private static ItemStack button(Material mat, String name, String... loreLines) {

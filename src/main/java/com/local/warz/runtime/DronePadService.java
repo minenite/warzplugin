@@ -463,8 +463,7 @@ public final class DronePadService implements Listener {
                 block.setType(Material.AIR, false);
             }
         }
-        player.getInventory().addItem(item).values().forEach(leftover ->
-                player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+        plugin.items().giveOrDrop(player, item);
         player.sendMessage(Component.text(airframe + " packed up.", NamedTextColor.AQUA));
         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8f, 1.0f);
         return true;

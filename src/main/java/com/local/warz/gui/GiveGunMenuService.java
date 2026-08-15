@@ -1690,9 +1690,12 @@ public final class GiveGunMenuService {
                 .toList();
     }
 
-    private static void give(Player player, ItemStack stack) {
-        player.getInventory().addItem(stack).values().forEach(left ->
-                player.getWorld().dropItemNaturally(player.getLocation(), left));
+    private void give(Player player, ItemStack stack) {
+        // Every one of the fifty-odd menu gives comes through here, and it used
+        // vanilla addItem - which merges on isSimilar. Ammo already in the pocket
+        // whose lore or components had drifted opened a second stack instead of
+        // topping up. giveOrDrop merges on what the item is.
+        plugin.items().giveOrDrop(player, stack);
     }
 
     private static void set(Inventory inv, int slot, Material mat, String name, String... loreLines) {
